@@ -1,4 +1,5 @@
 #include "execore_maps.h"
+#include "execore_mman.h"
 #include "execore_procfs.h"
 #include "execore_ptrace.h"
 #include "execore_stdlib.h"
@@ -61,30 +62,30 @@ static int sys_fstat(int fd, struct sys_stat_struct *statbuf) {
   return my_syscall2(__NR_fstat, fd, statbuf);
 }
 
-static void *mmap_path(void *addr, const char *path, int *fd, size_t *length) {
-  int local_fd = open(path, O_RDONLY);
-  if (local_fd == -1) {
+static void *mmap_path(void *addr, const char *path, size_t *length) {
+  int fd = open(path, O_RDONLY);
+  if (fd == -1) {
     fprintf(stderr, "open(%s) failed: errno=%d\n", path, errno);
     goto err;
   }
   struct sys_stat_struct statbuf;
-  int err = sys_fstat(local_fd, &statbuf);
+  int err = sys_fstat(fd, &statbuf);
   if (err < 0) {
     fprintf(stderr, "fstat(%s) failed: errno=%d\n", path, -err);
     goto err_close;
   }
-  void *p = mmap(addr, statbuf.st_size, PROT_READ, MAP_PRIVATE | MAP_FIXED,
-                 local_fd, 0);
+  void *p =
+      mmap(addr, statbuf.st_size, PROT_READ, MAP_PRIVATE | MAP_FIXED, fd, 0);
   if (p == MAP_FAILED) {
     fprintf(stderr, "mmap(%s) failed: errno=%d\n", path, errno);
     goto err_close;
   }
-  *fd = local_fd;
+  close(fd);
   *length = statbuf.st_size;
   return p;
 
 err_close:
-  close(local_fd);
+  close(fd);
 err:
   return NULL;
 }
@@ -136,7 +137,7 @@ err:
   return -1;
 }
 
-static void execore_1(Elf64_Ehdr *ehdr, int fd, size_t length, char **gdb_argv,
+static void execore_1(Elf64_Ehdr *ehdr, size_t length, char **gdb_argv,
                       const char *core_path) {
   void *end = (void *)ehdr + length;
   if ((void *)(ehdr + 1) > end || ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
@@ -175,25 +176,22 @@ static void execore_1(Elf64_Ehdr *ehdr, int fd, size_t length, char **gdb_argv,
     if (!is_mappable_phdr(phdr_cur))
       continue;
     void *p = mmap((void *)phdr_cur->p_vaddr, phdr_cur->p_memsz,
-                   get_prot(phdr_cur->p_flags),
+                   PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
     if (p == MAP_FAILED) {
-      fprintf(stderr,
-              "mmap(%s Phdr[%d]=%p, 0x%lx, MAP_ANONYMOUS) failed: errno=%d\n",
+      fprintf(stderr, "mmap(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n",
               core_path, phdr_i, (void *)phdr_cur->p_vaddr,
               (long)phdr_cur->p_memsz, errno);
       goto err_munmap;
     }
-    if (phdr_cur->p_filesz > 0) {
-      p = mmap((void *)phdr_cur->p_vaddr, phdr_cur->p_filesz,
-               get_prot(phdr_cur->p_flags), MAP_PRIVATE | MAP_FIXED, fd,
-               phdr_cur->p_offset);
-      if (p == MAP_FAILED) {
-        fprintf(stderr, "mmap(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n",
-                core_path, phdr_i, (void *)phdr_cur->p_vaddr,
-                (long)phdr_cur->p_filesz, errno);
-        goto err_munmap;
-      }
+    memcpy((void *)phdr_cur->p_vaddr, (void *)ehdr + phdr_cur->p_offset,
+           phdr_cur->p_filesz);
+    if (mprotect((void *)phdr_cur->p_vaddr, phdr_cur->p_memsz,
+                 get_prot(phdr_cur->p_flags)) == -1) {
+      fprintf(stderr, "mprotect(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n",
+              core_path, phdr_i, (void *)phdr_cur->p_vaddr,
+              (long)phdr_cur->p_memsz, errno);
+      goto err_munmap;
     }
   }
 
@@ -286,12 +284,15 @@ static void __attribute__((noreturn)) execore(void *arg) {
   }
   char *core_path = strdupa(aa->argv[1]);
 
-  char **gdb_argv = alloca((aa->argc + 2) * sizeof(char *));
+  char **gdb_argv = alloca((aa->argc + 4) * sizeof(char *));
   gdb_argv[0] = "/usr/bin/gdb";
   gdb_argv[1] = "-p";
+  /* https://github.com/mephi42/gdb-pounce/blob/v0.0.16/gdb-pounce#L411 */
+  gdb_argv[3] = "-ex";
+  gdb_argv[4] = "handle SIGSTOP nostop noprint nopass";
   for (int i = 2; i < aa->argc; i++)
-    gdb_argv[i + 1] = strdupa(aa->argv[i]);
-  gdb_argv[aa->argc + 1] = NULL;
+    gdb_argv[i + 3] = strdupa(aa->argv[i]);
+  gdb_argv[aa->argc + 3] = NULL;
 
   size_t environ_n;
   for (environ_n = 0; environ[environ_n]; environ_n++)
@@ -303,16 +304,13 @@ static void __attribute__((noreturn)) execore(void *arg) {
   if (unmap_all() == -1)
     goto err;
 
-  int fd;
   size_t length;
-  Elf64_Ehdr *core =
-      mmap_path((void *)(((unsigned long)_end + 4095UL) & -4096UL), core_path,
-                &fd, &length);
+  Elf64_Ehdr *core = mmap_path(
+      (void *)(((unsigned long)_end + 4095UL) & -4096UL), core_path, &length);
   if (core == NULL)
     goto err;
-  execore_1(core, fd, length, gdb_argv, core_path);
+  execore_1(core, length, gdb_argv, core_path);
   munmap(core, length);
-  close(fd);
 err:
   exit(EXIT_FAILURE);
 }
