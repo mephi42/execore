@@ -233,8 +233,7 @@ static void execore_1(Elf64_Ehdr *ehdr, int fd, size_t length, char **gdb_argv,
   char pid_str[32];
   itoa_r((long)pid, pid_str);
   gdb_argv[2] = pid_str;
-  char *envp[] = {NULL};
-  if (execve(gdb_argv[0], gdb_argv, envp) == -1) {
+  if (execve(gdb_argv[0], gdb_argv, environ) == -1) {
     fprintf(stderr, "execve() failed: errno=%d\n", errno);
     goto err_kill;
   }
@@ -293,6 +292,13 @@ static void __attribute__((noreturn)) execore(void *arg) {
   for (int i = 2; i < aa->argc; i++)
     gdb_argv[i + 1] = strdupa(aa->argv[i]);
   gdb_argv[aa->argc + 1] = NULL;
+
+  size_t environ_n;
+  for (environ_n = 0; environ[environ_n]; environ_n++)
+    environ[environ_n] = strdupa(environ[environ_n]);
+  char **new_environ = alloca((environ_n + 1) * sizeof(char *));
+  memcpy(new_environ, environ, (environ_n + 1) * sizeof(char *));
+  environ = new_environ;
 
   if (unmap_all() == -1)
     goto err;
