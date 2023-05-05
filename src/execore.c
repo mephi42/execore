@@ -2,6 +2,7 @@
 #include "execore_procfs.h"
 #include "execore_ptrace.h"
 #include "execore_stdlib.h"
+#include <alloca.h>
 #include <elf.h>
 #include <nolibc.h>
 
@@ -135,7 +136,7 @@ err:
   return -1;
 }
 
-static void execore_1(Elf64_Ehdr *ehdr, int fd, size_t length,
+static void execore_1(Elf64_Ehdr *ehdr, int fd, size_t length, char **gdb_argv,
                       const char *core_path) {
   void *end = (void *)ehdr + length;
   if ((void *)(ehdr + 1) > end || ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
@@ -226,14 +227,14 @@ static void execore_1(Elf64_Ehdr *ehdr, int fd, size_t length,
   }
   long pt_err = sys_ptrace(PTRACE_DETACH, pid, 0, (void *)SIGSTOP);
   if (pt_err < 0) {
-    fprintf(stderr, "PTRACE_DETACH failed: errno=%d\n", errno);
+    fprintf(stderr, "PTRACE_DETACH failed: errno=%d\n", (int)-pt_err);
     goto err_kill;
   }
   char pid_str[32];
   itoa_r((long)pid, pid_str);
-  char *argv[] = {"/usr/bin/gdb", "-p", pid_str, NULL};
+  gdb_argv[2] = pid_str;
   char *envp[] = {NULL};
-  if (execve(argv[0], argv, envp) == -1) {
+  if (execve(gdb_argv[0], gdb_argv, envp) == -1) {
     fprintf(stderr, "execve() failed: errno=%d\n", errno);
     goto err_kill;
   }
@@ -273,13 +274,25 @@ static int unmap_all(void) {
   return for_each_mapping(&unmap_1, &self);
 }
 
+struct argc_argv {
+  int argc;
+  char **argv;
+};
+
 static void __attribute__((noreturn)) execore(void *arg) {
-  char core_path[PATH_MAX];
-  strncpy(core_path, arg, sizeof(core_path));
-  if (core_path[sizeof(core_path) - 1] != 0) {
-    fprintf(stderr, "%s is too long\n", (const char *)arg);
+  struct argc_argv *aa = arg;
+  if (aa->argc < 2) {
+    fprintf(stderr, "Usage: %s CORE [GDB_ARG [GDB_ARG ...]]\n", aa->argv[0]);
     goto err;
   }
+  char *core_path = strdupa(aa->argv[1]);
+
+  char **gdb_argv = alloca((aa->argc + 2) * sizeof(char *));
+  gdb_argv[0] = "/usr/bin/gdb";
+  gdb_argv[1] = "-p";
+  for (int i = 2; i < aa->argc; i++)
+    gdb_argv[i + 1] = strdupa(aa->argv[i]);
+  gdb_argv[aa->argc + 1] = NULL;
 
   if (unmap_all() == -1)
     goto err;
@@ -291,7 +304,7 @@ static void __attribute__((noreturn)) execore(void *arg) {
                 &fd, &length);
   if (core == NULL)
     goto err;
-  execore_1(core, fd, length, core_path);
+  execore_1(core, fd, length, gdb_argv, core_path);
   munmap(core, length);
   close(fd);
 err:
@@ -299,9 +312,9 @@ err:
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    fprintf(stderr, "Usage: %s CORE\n", argv[0]);
-    return EXIT_FAILURE;
-  }
-  arch_switch_stack(execore, argv[1], local_stack + sizeof(local_stack));
+  struct argc_argv aa = {
+      .argc = argc,
+      .argv = argv,
+  };
+  arch_switch_stack(execore, &aa, local_stack + sizeof(local_stack));
 }
