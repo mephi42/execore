@@ -35,5 +35,5 @@ add_custom_target(fmt
 set(NOLIBC_SVN_URL
         https://github.com/torvalds/linux/tags/v6.3/tools/include/nolibc)
 add_custom_target(nolibc
-        COMMAND svn export ${NOLIBC_SVN_URL} src/nolibc
+        COMMAND rm -rf src/nolibc && svn export ${NOLIBC_SVN_URL} src/nolibc
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
