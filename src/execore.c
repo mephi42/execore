@@ -3,6 +3,7 @@
 #include "execore_procfs.h"
 #include "execore_ptrace.h"
 #include "execore_stdlib.h"
+#include "execore_string.h"
 #include "execore_unistd.h"
 #include <alloca.h>
 #include <elf.h>
@@ -85,11 +86,11 @@ static int pread64_exact(int fd, void *buf, size_t count, off_t offset) {
   while (count != 0) {
     ssize_t n_read = sys_pread64(fd, buf, count, offset);
     if (n_read < 0) {
-      SET_ERRNO(-n_read);
+      errno = -n_read;
       return -1;
     }
     if (n_read == 0) {
-      SET_ERRNO(EIO);
+      errno = EIO;
       return -1;
     }
     buf += n_read;
@@ -159,6 +160,7 @@ static void unmap_phdrs(int fd, Elf64_Ehdr *ehdr, int n,
       munmap((void *)phdr.p_vaddr, phdr.p_memsz);
   }
 err:
+  return;
 }
 
 static int map_phdrs(int fd, Elf64_Ehdr *ehdr, const char *core_path) {
@@ -251,7 +253,7 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
   char pid_str[32];
   itoa_r((long)pid, pid_str);
   gdb_argv[2] = pid_str;
-  if (execvpe(gdb_argv[0], gdb_argv, environ) == -1) {
+  if (EXECORE_(execvpe)(gdb_argv[0], gdb_argv, environ) == -1) {
     fprintf(stderr, "execvpe() failed: errno=%d\n", errno);
     goto err_kill;
   }
@@ -259,6 +261,7 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
 err_kill:
   kill(pid, SIGKILL);
 err:
+  return;
 }
 
 static int unmap_1(struct mapping *m, void *arg) {
@@ -282,7 +285,7 @@ static int unmap_all(void) {
     fprintf(stderr, "stat(/proc/self/exe) failed: errno=%d\n", errno);
     return -1;
   }
-  return for_each_mapping(&unmap_1, &self);
+  return for_each_mapping("/proc/self/maps", &unmap_1, &self);
 }
 
 struct argc_argv {

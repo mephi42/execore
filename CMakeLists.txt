@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 2.8.12)
 project(execore)
 set(CMAKE_C_STANDARD 11)
 
+#
+# Main.
+#
+
 set(SOURCES
         src/execore.c
         src/execore_maps.c
@@ -9,12 +13,13 @@ set(SOURCES
         src/execore_mman.h
         src/execore_procfs.h
         src/execore_ptrace.h
+        src/execore_stdlib.c
         src/execore_stdlib.h
         src/execore_string.h
         src/execore_unistd.c
         src/execore_unistd.h
         src/execore_user.h
-        src/stdint.h
+        src/fakelibc/stdint.h
 )
 add_executable(execore ${SOURCES})
 target_compile_options(execore PRIVATE
@@ -23,17 +28,57 @@ target_compile_options(execore PRIVATE
         -fno-stack-protector
         -Wall
         -Wextra
+        -Wno-unknown-attributes
         -Werror
 )
-target_include_directories(execore PRIVATE src src/nolibc)
+target_include_directories(execore PRIVATE src src/fakelibc src/nolibc)
 target_link_options(execore PRIVATE
         -nostdlib
         -static
 )
 target_link_libraries(execore gcc)
 
+#
+# Testing.
+#
+
+enable_testing()
+
+set(TEST_SOURCES
+        test/execore_maps.c
+        test/execore_stdlib.c
+        test/execore_unistd.c
+        test/nolibc.h
+        test/test.c
+        test/test.h
+        test/test_execvpe.c
+        test/test_maps.c
+)
+
+function(add_test_config SUFFIX CFLAGS LDFLAGS)
+  add_executable(test_execore${SUFFIX} ${TEST_SOURCES})
+  target_compile_definitions(test_execore${SUFFIX} PRIVATE
+          -DCMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+  )
+  target_compile_options(test_execore${SUFFIX} PRIVATE ${CFLAGS})
+  target_include_directories(test_execore${SUFFIX} PRIVATE test src)
+  target_link_options(test_execore${SUFFIX} PRIVATE ${LDFLAGS})
+  add_test(NAME test_execore${SUFFIX} COMMAND test_execore${SUFFIX})
+endfunction()
+
+add_test_config("" "" "")
+add_test_config(_asan -fsanitize=address -fsanitize=address)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  add_test_config(_msan -fsanitize=memory -fsanitize=memory)
+endif()
+add_test_config(_ubsan -fsanitize=undefined -fsanitize=undefined)
+
+#
+# Maintenance.
+#
+
 add_custom_target(fmt
-        COMMAND clang-format -i ${SOURCES}
+        COMMAND clang-format -i ${SOURCES} ${TEST_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 

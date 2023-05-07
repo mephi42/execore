@@ -25,9 +25,10 @@ static size_t get_max_path_len(const char *paths) {
   return max_len;
 }
 
-int execvpe(const char *file, char *const argv[], char *const envp[]) {
+int EXECORE_(execvpe)(const char *file, char *const argv[],
+                      char *const envp[]) {
   size_t len = strlen(file);
-  if (memchr(file, '/', len) != NULL)
+  if (EXECORE_(memchr)(file, '/', len) != NULL)
     return execve(file, argv, envp);
   const char *paths = getenv("PATH");
   if (paths == NULL)
@@ -47,6 +48,6 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
     }
   }
   if (local_errno != 0)
-    SET_ERRNO(local_errno);
+    errno = local_errno;
   return -1;
 }

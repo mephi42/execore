@@ -1,6 +1,8 @@
 #ifndef EXECORE_UNISTD_H
 #define EXECORE_UNISTD_H
 
-int execvpe(const char *file, char *const argv[], char *const envp[]);
+#include "execore.h"
+
+int EXECORE_(execvpe)(const char *file, char *const argv[], char *const envp[]);
 
 #endif

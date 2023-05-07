@@ -1,0 +1,204 @@
+fc000000-fcac0000 rw-p 00000000 00:00 0
+fcac0000-fd550000 ---p 00000000 00:00 0
+fd550000-feac0000 rw-p 00000000 00:00 0
+feac0000-100000000 ---p 00000000 00:00 0
+800000000-800480000 rw-p 00001000 00:3d 6179091                          /usr/share/elasticsearch/jdk/lib/server/classes.jsa
+800480000-800c73000 r--p 00481000 00:3d 6179091                          /usr/share/elasticsearch/jdk/lib/server/classes.jsa
+800c73000-801000000 ---p 00000000 00:00 0
+801000000-801040000 rw-p 00000000 00:00 0
+801040000-801080000 rw-p 00000000 00:00 0
+801080000-801100000 rw-p 00000000 00:00 0
+801100000-801180000 rw-p 00000000 00:00 0
+801180000-801260000 rw-p 00000000 00:00 0
+801260000-801270000 rw-p 00000000 00:00 0
+801270000-841000000 ---p 00000000 00:00 0
+5619df78d000-5619df78e000 r-xp 00000000 00:3d 5472749                    /usr/share/elasticsearch/jdk/bin/java
+5619df78f000-5619df790000 r--p 00001000 00:3d 5472749                    /usr/share/elasticsearch/jdk/bin/java
+5619df790000-5619df791000 rw-p 00002000 00:3d 5472749                    /usr/share/elasticsearch/jdk/bin/java
+5619e0edf000-5619e0f24000 rw-p 00000000 00:00 0                          [heap]
+7f3600000000-7f3600021000 rw-p 00000000 00:00 0
+7f3600021000-7f3604000000 ---p 00000000 00:00 0
+7f3608000000-7f3608777000 rw-p 00000000 00:00 0
+7f3608777000-7f360c000000 ---p 00000000 00:00 0
+7f360c000000-7f360c021000 rw-p 00000000 00:00 0
+7f360c021000-7f3610000000 ---p 00000000 00:00 0
+7f3610000000-7f3610021000 rw-p 00000000 00:00 0
+7f3610021000-7f3614000000 ---p 00000000 00:00 0
+7f3614000000-7f3614021000 rw-p 00000000 00:00 0
+7f3614021000-7f3618000000 ---p 00000000 00:00 0
+7f3618000000-7f36182f3000 rw-p 00000000 00:00 0
+7f36182f3000-7f361c000000 ---p 00000000 00:00 0
+7f361c000000-7f361c021000 rw-p 00000000 00:00 0
+7f361c021000-7f3620000000 ---p 00000000 00:00 0
+7f3620000000-7f3620021000 rw-p 00000000 00:00 0
+7f3620021000-7f3624000000 ---p 00000000 00:00 0
+7f3624000000-7f3624a97000 rw-p 00000000 00:00 0
+7f3624a97000-7f3628000000 ---p 00000000 00:00 0
+7f3628000000-7f3628021000 rw-p 00000000 00:00 0
+7f3628021000-7f362c000000 ---p 00000000 00:00 0
+7f362c000000-7f362c021000 rw-p 00000000 00:00 0
+7f362c021000-7f3630000000 ---p 00000000 00:00 0
+7f3630000000-7f3630021000 rw-p 00000000 00:00 0
+7f3630021000-7f3634000000 ---p 00000000 00:00 0
+7f3634000000-7f3634021000 rw-p 00000000 00:00 0
+7f3634021000-7f3638000000 ---p 00000000 00:00 0
+7f3638000000-7f363804b000 rw-p 00000000 00:00 0
+7f363804b000-7f363c000000 ---p 00000000 00:00 0
+7f363cc00000-7f363d000000 rw-p 00000000 00:00 0
+7f363d000000-7f363d300000 rw-p 00000000 00:00 0
+7f363d300000-7f363d400000 rw-p 00000000 00:00 0
+7f363d400000-7f363d6c0000 rw-p 00000000 00:00 0
+7f363d6c0000-7f363d700000 rw-p 00000000 00:00 0
+7f363d700000-7f363d8c0000 rw-p 00000000 00:00 0
+7f363d8c0000-7f363d900000 rw-p 00000000 00:00 0
+7f363d900000-7f363db00000 rw-p 00000000 00:00 0
+7f363db00000-7f363dc00000 rw-p 00000000 00:00 0
+7f363dc00000-7f363dce0000 rw-p 00000000 00:00 0
+7f363dce0000-7f363dd00000 ---p 00000000 00:00 0
+7f363dd00000-7f363dd30000 rw-p 00000000 00:00 0
+7f363dd30000-7f3640c00000 ---p 00000000 00:00 0
+7f3640ee4000-7f36413d4000 rwxp 00000000 00:00 0
+7f36413d4000-7f364841b000 ---p 00000000 00:00 0
+7f364841b000-7f364868b000 rwxp 00000000 00:00 0
+7f364868b000-7f36489ac000 ---p 00000000 00:00 0
+7f36489ac000-7f3648c1c000 rwxp 00000000 00:00 0
+7f3648c1c000-7f364fee4000 ---p 00000000 00:00 0
+7f364fee4000-7f3658000000 r--s 00000000 00:3d 6179083                    /usr/share/elasticsearch/jdk/lib/modules
+7f3658000000-7f3658d42000 rw-p 00000000 00:00 0
+7f3658d42000-7f365c000000 ---p 00000000 00:00 0
+7f365cd07000-7f365cd0b000 ---p 00000000 00:00 0
+7f365cd0b000-7f365ce08000 rw-p 00000000 00:00 0
+7f365ce08000-7f365ce0c000 ---p 00000000 00:00 0
+7f365ce0c000-7f365ce2a000 rw-p 00000000 00:00 0
+7f365ce2a000-7f365ce37000 r-xp 00000000 00:3d 6179081                    /usr/share/elasticsearch/jdk/lib/libverify.so
+7f365ce37000-7f365ce39000 r--p 0000c000 00:3d 6179081                    /usr/share/elasticsearch/jdk/lib/libverify.so
+7f365ce39000-7f365ce3a000 rw-p 0000e000 00:3d 6179081                    /usr/share/elasticsearch/jdk/lib/libverify.so
+7f365ce3a000-7f365ce3e000 ---p 00000000 00:00 0
+7f365ce3e000-7f365cf3b000 rw-p 00000000 00:00 0
+7f365cf3b000-7f365cf3f000 ---p 00000000 00:00 0
+7f365cf3f000-7f365d03c000 rw-p 00000000 00:00 0
+7f365d03c000-7f365d03d000 ---p 00000000 00:00 0
+7f365d03d000-7f365d13e000 rw-p 00000000 00:00 0
+7f365d13e000-7f365d142000 ---p 00000000 00:00 0
+7f365d142000-7f365d23f000 rw-p 00000000 00:00 0
+7f365d23f000-7f365d243000 ---p 00000000 00:00 0
+7f365d243000-7f365d340000 rw-p 00000000 00:00 0
+7f365d340000-7f365d344000 ---p 00000000 00:00 0
+7f365d344000-7f365d441000 rw-p 00000000 00:00 0
+7f365d441000-7f365d445000 ---p 00000000 00:00 0
+7f365d445000-7f365d542000 rw-p 00000000 00:00 0
+7f365d542000-7f365d546000 ---p 00000000 00:00 0
+7f365d546000-7f365d643000 rw-p 00000000 00:00 0
+7f365d643000-7f365d647000 ---p 00000000 00:00 0
+7f365d647000-7f365d744000 rw-p 00000000 00:00 0
+7f365d744000-7f365d748000 ---p 00000000 00:00 0
+7f365d748000-7f365d845000 rw-p 00000000 00:00 0
+7f365d845000-7f365d849000 ---p 00000000 00:00 0
+7f365d849000-7f365d946000 rw-p 00000000 00:00 0
+7f365d946000-7f365d947000 ---p 00000000 00:00 0
+7f365d947000-7f365da48000 rw-p 00000000 00:00 0
+7f365da48000-7f365db16000 r-xp 00000000 00:3d 6179067                    /usr/share/elasticsearch/jdk/lib/libjsvml.so
+7f365db16000-7f365db17000 r--p 000cd000 00:3d 6179067                    /usr/share/elasticsearch/jdk/lib/libjsvml.so
+7f365db17000-7f365db18000 rw-p 000ce000 00:3d 6179067                    /usr/share/elasticsearch/jdk/lib/libjsvml.so
+7f365db18000-7f365dc35000 rw-p 00000000 00:00 0
+7f365dc35000-7f365dc3b000 r-xp 00000000 00:3d 6179071                    /usr/share/elasticsearch/jdk/lib/libmanagement_ext.so
+7f365dc3b000-7f365dc3c000 r--p 00005000 00:3d 6179071                    /usr/share/elasticsearch/jdk/lib/libmanagement_ext.so
+7f365dc3c000-7f365dc3d000 rw-p 00006000 00:3d 6179071                    /usr/share/elasticsearch/jdk/lib/libmanagement_ext.so
+7f365dc3d000-7f365dc41000 r-xp 00000000 00:3d 6179069                    /usr/share/elasticsearch/jdk/lib/libmanagement.so
+7f365dc41000-7f365dc42000 r--p 00003000 00:3d 6179069                    /usr/share/elasticsearch/jdk/lib/libmanagement.so
+7f365dc42000-7f365dc43000 rw-p 00004000 00:3d 6179069                    /usr/share/elasticsearch/jdk/lib/libmanagement.so
+7f365dc43000-7f365dc4a000 r-xp 00000000 00:3d 6179082                    /usr/share/elasticsearch/jdk/lib/libzip.so
+7f365dc4a000-7f365dc4b000 ---p 00007000 00:3d 6179082                    /usr/share/elasticsearch/jdk/lib/libzip.so
+7f365dc4b000-7f365dc4c000 r--p 00007000 00:3d 6179082                    /usr/share/elasticsearch/jdk/lib/libzip.so
+7f365dc4c000-7f365dc4d000 rw-p 00008000 00:3d 6179082                    /usr/share/elasticsearch/jdk/lib/libzip.so
+7f365dc4d000-7f365dc59000 r-xp 00000000 00:3d 6179073                    /usr/share/elasticsearch/jdk/lib/libnet.so
+7f365dc59000-7f365dc5a000 r--p 0000b000 00:3d 6179073                    /usr/share/elasticsearch/jdk/lib/libnet.so
+7f365dc5a000-7f365dc5b000 rw-p 0000c000 00:3d 6179073                    /usr/share/elasticsearch/jdk/lib/libnet.so
+7f365dc5b000-7f365dc6e000 r-xp 00000000 00:3d 6179074                    /usr/share/elasticsearch/jdk/lib/libnio.so
+7f365dc6e000-7f365dc6f000 ---p 00013000 00:3d 6179074                    /usr/share/elasticsearch/jdk/lib/libnio.so
+7f365dc6f000-7f365dc70000 r--p 00013000 00:3d 6179074                    /usr/share/elasticsearch/jdk/lib/libnio.so
+7f365dc70000-7f365dc71000 rw-p 00014000 00:3d 6179074                    /usr/share/elasticsearch/jdk/lib/libnio.so
+7f365dc71000-7f365dc7c000 rw-p 00000000 00:00 0
+7f365dc7c000-7f365dc87000 ---p 00000000 00:00 0
+7f365dc87000-7f365dc8d000 rw-p 00000000 00:00 0
+7f365dc8d000-7f365dc91000 ---p 00000000 00:00 0
+7f365dc91000-7f365dc9d000 rw-p 00000000 00:00 0
+7f365dc9d000-7f365dca8000 ---p 00000000 00:00 0
+7f365dca8000-7f365dcad000 rw-p 00000000 00:00 0
+7f365dcad000-7f365dd93000 ---p 00000000 00:00 0
+7f365dd93000-7f365dd9d000 rw-p 00000000 00:00 0
+7f365dd9d000-7f365de7e000 ---p 00000000 00:00 0
+7f365de7e000-7f365de83000 rw-p 00000000 00:00 0
+7f365de83000-7f365de8a000 ---p 00000000 00:00 0
+7f365de8a000-7f365deb0000 r-xp 00000000 00:3d 6179059                    /usr/share/elasticsearch/jdk/lib/libjava.so
+7f365deb0000-7f365deb1000 r--p 00025000 00:3d 6179059                    /usr/share/elasticsearch/jdk/lib/libjava.so
+7f365deb1000-7f365deb2000 rw-p 00026000 00:3d 6179059                    /usr/share/elasticsearch/jdk/lib/libjava.so
+7f365deb2000-7f365deb3000 rw-p 00000000 00:00 0
+7f365deb3000-7f365debb000 rw-s 00000000 00:3d 6179811                    /tmp/hsperfdata_elasticsearch/7
+7f365debb000-7f365debe000 r--p 00000000 00:3d 6068124                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f365debe000-7f365dec5000 r-xp 00003000 00:3d 6068124                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f365dec5000-7f365dec7000 r--p 0000a000 00:3d 6068124                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f365dec7000-7f365dec8000 r--p 0000b000 00:3d 6068124                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f365dec8000-7f365dec9000 rw-p 0000c000 00:3d 6068124                    /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+7f365dec9000-7f365decf000 rw-p 00000000 00:00 0
+7f365ded2000-7f365deed000 r-xp 00000000 00:3d 6179063                    /usr/share/elasticsearch/jdk/lib/libjimage.so
+7f365deed000-7f365deee000 ---p 0001b000 00:3d 6179063                    /usr/share/elasticsearch/jdk/lib/libjimage.so
+7f365deee000-7f365def0000 r--p 0001b000 00:3d 6179063                    /usr/share/elasticsearch/jdk/lib/libjimage.so
+7f365def0000-7f365def1000 rw-p 0001d000 00:3d 6179063                    /usr/share/elasticsearch/jdk/lib/libjimage.so
+7f365def1000-7f365def5000 ---p 00000000 00:00 0
+7f365def5000-7f365dff2000 rw-p 00000000 00:00 0
+7f365dff2000-7f365dfff000 r--p 00000000 00:3d 6068101                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f365dfff000-7f365e0a6000 r-xp 0000d000 00:3d 6068101                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f365e0a6000-7f365e13f000 r--p 000b4000 00:3d 6068101                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f365e13f000-7f365e140000 r--p 0014c000 00:3d 6068101                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f365e140000-7f365e141000 rw-p 0014d000 00:3d 6068101                    /usr/lib/x86_64-linux-gnu/libm-2.31.so
+7f365e141000-7f365e143000 r--p 00000000 00:3d 6068157                    /usr/lib/x86_64-linux-gnu/librt-2.31.so
+7f365e143000-7f365e147000 r-xp 00002000 00:3d 6068157                    /usr/lib/x86_64-linux-gnu/librt-2.31.so
+7f365e147000-7f365e149000 r--p 00006000 00:3d 6068157                    /usr/lib/x86_64-linux-gnu/librt-2.31.so
+7f365e149000-7f365e14a000 r--p 00007000 00:3d 6068157                    /usr/lib/x86_64-linux-gnu/librt-2.31.so
+7f365e14a000-7f365e14b000 rw-p 00008000 00:3d 6068157                    /usr/lib/x86_64-linux-gnu/librt-2.31.so
+7f365e14b000-7f365f367000 r-xp 00000000 00:3d 6179100                    /usr/share/elasticsearch/jdk/lib/server/libjvm.so
+7f365f367000-7f365f431000 r--p 0121b000 00:3d 6179100                    /usr/share/elasticsearch/jdk/lib/server/libjvm.so
+7f365f431000-7f365f466000 rw-p 012e5000 00:3d 6179100                    /usr/share/elasticsearch/jdk/lib/server/libjvm.so
+7f365f466000-7f365f4c7000 rw-p 00000000 00:00 0
+7f365f4c7000-7f365f4e9000 r--p 00000000 00:3d 6068059                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f365f4e9000-7f365f661000 r-xp 00022000 00:3d 6068059                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f365f661000-7f365f6af000 r--p 0019a000 00:3d 6068059                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f365f6af000-7f365f6b3000 r--p 001e7000 00:3d 6068059                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f365f6b3000-7f365f6b5000 rw-p 001eb000 00:3d 6068059                    /usr/lib/x86_64-linux-gnu/libc-2.31.so
+7f365f6b5000-7f365f6b9000 rw-p 00000000 00:00 0
+7f365f6b9000-7f365f6ba000 r--p 00000000 00:3d 6068070                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f365f6ba000-7f365f6bc000 r-xp 00001000 00:3d 6068070                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f365f6bc000-7f365f6bd000 r--p 00003000 00:3d 6068070                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f365f6bd000-7f365f6be000 r--p 00003000 00:3d 6068070                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f365f6be000-7f365f6bf000 rw-p 00004000 00:3d 6068070                    /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+7f365f6bf000-7f365f6c5000 r--p 00000000 00:3d 6068153                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f365f6c5000-7f365f6d6000 r-xp 00006000 00:3d 6068153                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f365f6d6000-7f365f6dc000 r--p 00017000 00:3d 6068153                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f365f6dc000-7f365f6dd000 r--p 0001c000 00:3d 6068153                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f365f6dd000-7f365f6de000 rw-p 0001d000 00:3d 6068153                    /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+7f365f6de000-7f365f6e2000 rw-p 00000000 00:00 0
+7f365f6e2000-7f365f6f0000 r-xp 00000000 00:3d 6179064                    /usr/share/elasticsearch/jdk/lib/libjli.so
+7f365f6f0000-7f365f6f1000 ---p 0000e000 00:3d 6179064                    /usr/share/elasticsearch/jdk/lib/libjli.so
+7f365f6f1000-7f365f6f2000 r--p 0000e000 00:3d 6179064                    /usr/share/elasticsearch/jdk/lib/libjli.so
+7f365f6f2000-7f365f6f3000 rw-p 0000f000 00:3d 6179064                    /usr/share/elasticsearch/jdk/lib/libjli.so
+7f365f6f3000-7f365f6f5000 r--p 00000000 00:3d 6068189                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f365f6f5000-7f365f706000 r-xp 00002000 00:3d 6068189                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f365f706000-7f365f70c000 r--p 00013000 00:3d 6068189                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f365f70c000-7f365f70d000 ---p 00019000 00:3d 6068189                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f365f70d000-7f365f70e000 r--p 00019000 00:3d 6068189                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f365f70e000-7f365f70f000 rw-p 0001a000 00:3d 6068189                    /usr/lib/x86_64-linux-gnu/libz.so.1.2.11
+7f365f70f000-7f365f711000 rw-p 00000000 00:00 0
+7f365f712000-7f365f713000 ---p 00000000 00:00 0
+7f365f713000-7f365f714000 r--p 00000000 00:00 0
+7f365f714000-7f365f715000 r--p 00000000 00:3d 6068037                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f365f715000-7f365f738000 r-xp 00001000 00:3d 6068037                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f365f738000-7f365f740000 r--p 00024000 00:3d 6068037                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f365f740000-7f365f741000 ---p 00000000 00:00 0
+7f365f741000-7f365f742000 r--p 0002c000 00:3d 6068037                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f365f742000-7f365f743000 rw-p 0002d000 00:3d 6068037                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+7f365f743000-7f365f744000 rw-p 00000000 00:00 0
+7ffc532bd000-7ffc532de000 rw-p 00000000 00:00 0                          [stack]
+7ffc53358000-7ffc5335c000 r--p 00000000 00:00 0                          [vvar]
+7ffc5335c000-7ffc5335e000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
