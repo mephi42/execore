@@ -3,6 +3,7 @@
 #include "execore_procfs.h"
 #include "execore_ptrace.h"
 #include "execore_stdlib.h"
+#include "execore_unistd.h"
 #include <alloca.h>
 #include <elf.h>
 #include <nolibc.h>
@@ -250,8 +251,8 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
   char pid_str[32];
   itoa_r((long)pid, pid_str);
   gdb_argv[2] = pid_str;
-  if (execve(gdb_argv[0], gdb_argv, environ) == -1) {
-    fprintf(stderr, "execve() failed: errno=%d\n", errno);
+  if (execvpe(gdb_argv[0], gdb_argv, environ) == -1) {
+    fprintf(stderr, "execvpe() failed: errno=%d\n", errno);
     goto err_kill;
   }
 
@@ -298,7 +299,7 @@ static void __attribute__((noreturn)) execore(void *arg) {
   char *core_path = strdupa(aa->argv[1]);
 
   char **gdb_argv = alloca((aa->argc + 4) * sizeof(char *));
-  gdb_argv[0] = "/usr/bin/gdb";
+  gdb_argv[0] = "gdb";
   gdb_argv[1] = "-p";
   /* https://github.com/mephi42/gdb-pounce/blob/v0.0.16/gdb-pounce#L411 */
   gdb_argv[3] = "-ex";
