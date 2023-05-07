@@ -21,12 +21,13 @@ static char local_stack[8 * 1024 * 1024];
 static __attribute__((noreturn)) void
 arch_switch_stack(void __attribute__((noreturn)) (*f)(void *), void *arg,
                   void *stack) {
+  stack = (void *)((long)stack & -0x10L) - 8;
   asm("mov %[stack],%%rsp\n"
       "mov %[arg],%%rdi\n"
       "jmp *%[f]\n"
       :
       : [f] "r"(f), [arg] "r"(arg), [stack] "r"(stack)
-      : "rdi");
+      : "rdi", "memory");
   __builtin_unreachable();
 }
 

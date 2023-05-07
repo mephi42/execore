@@ -20,4 +20,5 @@ gdb "$phoenix" \
   --batch \
   --eval-command='x/i $pc' \
   --eval-command=continue \
-  --eval-command=quit | grep "I am alive!"
+  --eval-command=quit | tee log
+grep "I am alive!" log >/dev/null
