@@ -13,8 +13,9 @@ static char local_stack[8 * 1024 * 1024];
 
 #define ARCH_EM EM_X86_64
 
-static void arch_switch_stack(void __attribute__((noreturn)) (*f)(void *),
-                              void *arg, void *stack) {
+static __attribute__((noreturn)) void
+arch_switch_stack(void __attribute__((noreturn)) (*f)(void *), void *arg,
+                  void *stack) {
   asm("mov %[stack],%%rsp\n"
       "mov %[arg],%%rdi\n"
       "jmp *%[f]\n"
@@ -58,38 +59,6 @@ err:
 #error Unsupported architecture
 #endif
 
-static int sys_fstat(int fd, struct sys_stat_struct *statbuf) {
-  return my_syscall2(__NR_fstat, fd, statbuf);
-}
-
-static void *mmap_path(void *addr, const char *path, size_t *length) {
-  int fd = open(path, O_RDONLY);
-  if (fd == -1) {
-    fprintf(stderr, "open(%s) failed: errno=%d\n", path, errno);
-    goto err;
-  }
-  struct sys_stat_struct statbuf;
-  int err = sys_fstat(fd, &statbuf);
-  if (err < 0) {
-    fprintf(stderr, "fstat(%s) failed: errno=%d\n", path, -err);
-    goto err_close;
-  }
-  void *p =
-      mmap(addr, statbuf.st_size, PROT_READ, MAP_PRIVATE | MAP_FIXED, fd, 0);
-  if (p == MAP_FAILED) {
-    fprintf(stderr, "mmap(%s) failed: errno=%d\n", path, errno);
-    goto err_close;
-  }
-  close(fd);
-  *length = statbuf.st_size;
-  return p;
-
-err_close:
-  close(fd);
-err:
-  return NULL;
-}
-
 static int is_mappable_phdr(Elf64_Phdr *phdr) {
   if (phdr->p_type != PT_LOAD)
     return 0;
@@ -107,29 +76,71 @@ static int get_prot(Elf64_Word p_flags) {
   return prot;
 }
 
-static int setregset(pid_t pid, const void *data, const void *data_end,
-                     const char *core_path) {
-  const void *p = data;
-  while (p != data_end) {
-    if (data_end - data < (ssize_t)(sizeof(unsigned int) * 3)) {
-      fprintf(stderr, "%s contains an incomplete PT_NOTE\n", core_path);
-      goto err;
-    }
-    const unsigned int *note = p;
-    const char *name = (const char *)(note + 3);
-    const void *desc = name + ((note[0] + 3) & -4);
-    if (desc < (const void *)name || desc > data_end) {
-      fprintf(stderr, "%s contains a bad namesz\n", core_path);
-      goto err;
-    }
-    p = desc + ((note[1] + 3) & -4);
-    if (p < desc || p > data_end) {
-      fprintf(stderr, "%s contains a bad descsz\n", core_path);
-      goto err;
-    }
-    if (arch_setregset(pid, name, note[2], desc, desc + note[1], core_path) ==
-        -1)
+ssize_t sys_pread64(int fd, void *buf, size_t count, off_t offset) {
+  return my_syscall4(__NR_pread64, fd, buf, count, offset);
+}
+
+static int pread64_exact(int fd, void *buf, size_t count, off_t offset) {
+  while (count != 0) {
+    ssize_t n_read = sys_pread64(fd, buf, count, offset);
+    if (n_read < 0) {
+      SET_ERRNO(-n_read);
       return -1;
+    }
+    if (n_read == 0) {
+      SET_ERRNO(EIO);
+      return -1;
+    }
+    buf += n_read;
+    count -= n_read;
+    offset += n_read;
+  }
+  return 0;
+}
+
+#define PREAD64_EXACT(fd, buf, count, offset, label)                           \
+  do {                                                                         \
+    if (pread64_exact(fd, buf, count, offset) == -1) {                         \
+      fprintf(stderr, "Could not read from %s: errno=%d\n", core_path, errno); \
+      goto label;                                                              \
+    }                                                                          \
+  } while (0)
+
+static int setregset_1(pid_t pid, int fd, unsigned int type, off_t name_off,
+                       unsigned int name_sz, off_t desc_off,
+                       unsigned int desc_sz, const char *core_path) {
+  char *name = alloca(name_sz);
+  PREAD64_EXACT(fd, name, name_sz, name_off, err);
+  char *desc = alloca(desc_sz);
+  PREAD64_EXACT(fd, desc, desc_sz, desc_off, err);
+  return arch_setregset(pid, name, type, desc, desc + desc_sz, core_path);
+
+err:
+  return -1;
+}
+
+static int setregset(pid_t pid, int fd, Elf64_Phdr *phdr,
+                     const char *core_path) {
+  off_t off = phdr->p_offset;
+  off_t end = off + phdr->p_filesz;
+  if (off > end) {
+    fprintf(stderr, "%s contains a bad p_offset or p_filesz\n", core_path);
+    goto err;
+  }
+  while (off != end) {
+    unsigned int note[3];
+    PREAD64_EXACT(fd, note, sizeof(note), off, err);
+    off_t name_off = off + sizeof(note);
+    off_t desc_off = name_off + ((note[0] + 3) & -4);
+    off_t next_off = desc_off + ((note[1] + 3) & -4);
+    if (name_off <= off || desc_off < name_off || next_off < desc_off) {
+      fprintf(stderr, "%s contains a bad namesz or descsz\n", core_path);
+      goto err;
+    }
+    if (setregset_1(pid, fd, note[2], name_off, note[0], desc_off, note[1],
+                    core_path) == -1)
+      goto err;
+    off = next_off;
   }
   return 0;
 
@@ -137,70 +148,78 @@ err:
   return -1;
 }
 
-static void execore_1(Elf64_Ehdr *ehdr, size_t length, char **gdb_argv,
-                      const char *core_path) {
-  void *end = (void *)ehdr + length;
-  if ((void *)(ehdr + 1) > end || ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
-      ehdr->e_ident[EI_MAG1] != ELFMAG1 || ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
-      ehdr->e_ident[EI_MAG3] != ELFMAG3) {
-    fprintf(stderr, "%s is not an ELF file\n", core_path);
-    goto err;
+static void unmap_phdrs(int fd, Elf64_Ehdr *ehdr, int n,
+                        const char *core_path) {
+  for (int i = 0; i < n; i++) {
+    Elf64_Phdr phdr;
+    PREAD64_EXACT(fd, &phdr, sizeof(phdr), ehdr->e_phoff + sizeof(phdr) * i,
+                  err);
+    if (is_mappable_phdr(&phdr))
+      munmap((void *)phdr.p_vaddr, phdr.p_memsz);
   }
-  if (ehdr->e_ident[EI_CLASS] != ELFCLASS64) {
-    fprintf(stderr, "%s is not a 64-bit ELF file\n", core_path);
-    goto err;
-  }
-  if (ehdr->e_type != ET_CORE) {
-    fprintf(stderr, "%s is not a core file\n", core_path);
-    goto err;
-  }
-  if (ehdr->e_machine != ARCH_EM) {
-    fprintf(stderr, "%s is for a different machine\n", core_path);
-    goto err;
-  }
-  Elf64_Phdr *phdr = (void *)ehdr + ehdr->e_phoff;
-  Elf64_Phdr *phdr_end = phdr + ehdr->e_phnum;
-  if ((void *)phdr > end || phdr > phdr_end || (void *)phdr_end > end) {
-    fprintf(stderr, "%s contains a bad e_phoff or e_phnum\n", core_path);
-    goto err;
-  }
-  int phdr_i = 0;
-  for (; phdr_i < ehdr->e_phnum; phdr_i++) {
-    Elf64_Phdr *phdr_cur = &phdr[phdr_i];
-    void *data = (void *)ehdr + phdr_cur->p_offset;
-    void *data_end = data + phdr_cur->p_filesz;
-    if (data > end || data > data_end || data_end > end) {
-      fprintf(stderr, "%s contains a bad Phdr[%d]\n", core_path, phdr_i);
-      goto err_munmap;
-    }
-    if (!is_mappable_phdr(phdr_cur))
+err:
+}
+
+static int map_phdrs(int fd, Elf64_Ehdr *ehdr, const char *core_path) {
+  int i = 0;
+  for (; i < ehdr->e_phnum; i++) {
+    Elf64_Phdr phdr;
+    PREAD64_EXACT(fd, &phdr, sizeof(phdr), ehdr->e_phoff + sizeof(phdr) * i,
+                  err);
+    if (!is_mappable_phdr(&phdr))
       continue;
-    void *p = mmap((void *)phdr_cur->p_vaddr, phdr_cur->p_memsz,
-                   PROT_READ | PROT_WRITE,
+    void *p = mmap((void *)phdr.p_vaddr, phdr.p_memsz, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
     if (p == MAP_FAILED) {
       fprintf(stderr, "mmap(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n",
-              core_path, phdr_i, (void *)phdr_cur->p_vaddr,
-              (long)phdr_cur->p_memsz, errno);
-      goto err_munmap;
+              core_path, i, (void *)phdr.p_vaddr, (long)phdr.p_memsz, errno);
+      goto err;
     }
-    memcpy((void *)phdr_cur->p_vaddr, (void *)ehdr + phdr_cur->p_offset,
-           phdr_cur->p_filesz);
-    if (mprotect((void *)phdr_cur->p_vaddr, phdr_cur->p_memsz,
-                 get_prot(phdr_cur->p_flags)) == -1) {
+    PREAD64_EXACT(fd, (void *)phdr.p_vaddr, phdr.p_filesz, phdr.p_offset, err);
+    if (mprotect((void *)phdr.p_vaddr, phdr.p_memsz, get_prot(phdr.p_flags)) ==
+        -1) {
       fprintf(stderr, "mprotect(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n",
-              core_path, phdr_i, (void *)phdr_cur->p_vaddr,
-              (long)phdr_cur->p_memsz, errno);
-      goto err_munmap;
+              core_path, i, (void *)phdr.p_vaddr, (long)phdr.p_memsz, errno);
+      goto err;
     }
+  }
+  return 0;
+
+err:
+  unmap_phdrs(fd, ehdr, i, core_path);
+  return -1;
+}
+
+static void execore_1(int fd, char **gdb_argv, const char *core_path) {
+  Elf64_Ehdr ehdr;
+  PREAD64_EXACT(fd, &ehdr, sizeof(ehdr), 0, err);
+  if (ehdr.e_ident[EI_MAG0] != ELFMAG0 || ehdr.e_ident[EI_MAG1] != ELFMAG1 ||
+      ehdr.e_ident[EI_MAG2] != ELFMAG2 || ehdr.e_ident[EI_MAG3] != ELFMAG3) {
+    fprintf(stderr, "%s is not an ELF file\n", core_path);
+    goto err;
+  }
+  if (ehdr.e_ident[EI_CLASS] != ELFCLASS64) {
+    fprintf(stderr, "%s is not a 64-bit ELF file\n", core_path);
+    goto err;
+  }
+  if (ehdr.e_type != ET_CORE) {
+    fprintf(stderr, "%s is not a core file\n", core_path);
+    goto err;
+  }
+  if (ehdr.e_machine != ARCH_EM) {
+    fprintf(stderr, "%s is for a different machine\n", core_path);
+    goto err;
   }
 
   pid_t pid = fork();
   if (pid == -1) {
     fprintf(stderr, "fork() failed: errno=%d\n", errno);
-    goto err_munmap;
+    goto err;
   }
   if (pid == 0) {
+    if (map_phdrs(fd, &ehdr, core_path) == -1)
+      abort();
+    close(fd);
     sys_ptrace(PTRACE_TRACEME, 0, 0, 0);
     raise(SIGSTOP);
     abort();
@@ -215,14 +234,14 @@ static void execore_1(Elf64_Ehdr *ehdr, size_t length, char **gdb_argv,
     fprintf(stderr, "The child process did not stop itself\n");
     goto err_kill;
   }
-  for (int i = 0; i < ehdr->e_phnum; i++) {
-    Elf64_Phdr *phdr_cur = &phdr[i];
-    void *data = (void *)ehdr + phdr_cur->p_offset;
-    void *data_end = data + phdr_cur->p_filesz;
-    if (phdr_cur->p_type == PT_NOTE &&
-        setregset(pid, data, data_end, core_path) == -1)
-      goto err_munmap;
+  for (int i = 0; i < ehdr.e_phnum; i++) {
+    Elf64_Phdr phdr;
+    PREAD64_EXACT(fd, &phdr, sizeof(phdr), ehdr.e_phoff + sizeof(phdr) * i,
+                  err_kill);
+    if (phdr.p_type == PT_NOTE && setregset(pid, fd, &phdr, core_path) == -1)
+      goto err_kill;
   }
+
   long pt_err = sys_ptrace(PTRACE_DETACH, pid, 0, (void *)SIGSTOP);
   if (pt_err < 0) {
     fprintf(stderr, "PTRACE_DETACH failed: errno=%d\n", (int)-pt_err);
@@ -238,14 +257,8 @@ static void execore_1(Elf64_Ehdr *ehdr, size_t length, char **gdb_argv,
 
 err_kill:
   kill(pid, SIGKILL);
-err_munmap:
-  for (int j = 0; j < phdr_i; j++)
-    if (is_mappable_phdr(&phdr[j]))
-      munmap((void *)phdr[j].p_vaddr, phdr[j].p_memsz);
 err:
 }
-
-extern char _end[];
 
 static int unmap_1(struct mapping *m, void *arg) {
   struct stat *self = arg;
@@ -304,13 +317,15 @@ static void __attribute__((noreturn)) execore(void *arg) {
   if (unmap_all() == -1)
     goto err;
 
-  size_t length;
-  Elf64_Ehdr *core = mmap_path(
-      (void *)(((unsigned long)_end + 4095UL) & -4096UL), core_path, &length);
-  if (core == NULL)
+  int fd = open(core_path, O_RDONLY);
+  if (fd == -1) {
+    fprintf(stderr, "open(%s) failed: errno=%d\n", core_path, errno);
     goto err;
-  execore_1(core, length, gdb_argv, core_path);
-  munmap(core, length);
+  }
+
+  execore_1(fd, gdb_argv, core_path);
+
+  close(fd);
 err:
   exit(EXIT_FAILURE);
 }
