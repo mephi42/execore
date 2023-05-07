@@ -11,6 +11,8 @@ set(SOURCES
         src/execore_ptrace.h
         src/execore_stdlib.h
         src/execore_string.h
+        src/execore_unistd.c
+        src/execore_unistd.h
         src/execore_user.h
         src/stdint.h
 )
