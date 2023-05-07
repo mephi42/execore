@@ -12,7 +12,7 @@ static __attribute__((unused)) int mprotect(void *addr, size_t len, int prot) {
   int ret = sys_mprotect(addr, len, prot);
 
   if (ret < 0) {
-    SET_ERRNO(-ret);
+    errno = -ret;
     ret = -1;
   }
   return ret;
