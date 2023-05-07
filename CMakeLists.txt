@@ -31,9 +31,11 @@ target_compile_options(execore PRIVATE
         -fno-stack-protector
         -Wall
         -Wextra
-        -Wno-unknown-attributes
         -Werror
 )
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  target_compile_options(execore PRIVATE -Wno-unknown-attributes)
+endif()
 target_include_directories(execore PRIVATE src src/fakelibc src/nolibc)
 target_link_options(execore PRIVATE
         -nostdlib
