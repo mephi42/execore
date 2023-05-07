@@ -35,16 +35,19 @@ static int arch_is_mappable_addr(void *p) {
   return (unsigned long)p != 0xffffffffff600000;
 }
 
-static int arch_setregset(pid_t pid, struct note *n, const char *core_path) {
+static int arch_setregset(pid_t pid, int fd, struct note *n,
+                          const char *core_path) {
   if (strcmp(n->name, "CORE") == 0 && n->type == NT_PRSTATUS) {
-    if (n->desc_end - n->desc != (ssize_t)sizeof(struct elf_prstatus)) {
+    if (n->desc_sz != (ssize_t)sizeof(struct elf_prstatus)) {
       fprintf(stderr, "%s contains a bad NT_PRSTATUS\n", core_path);
       goto err;
     }
-    struct elf_prstatus *prstatus = (struct elf_prstatus *)n->desc;
+    elf_gregset_t reg;
+    PREAD_EXACT(core_path, fd, &reg, sizeof(reg),
+                n->desc_off + offsetof(struct elf_prstatus, pr_reg), err);
     struct iovec iov = {
-        .iov_base = &prstatus->pr_reg,
-        .iov_len = sizeof(prstatus->pr_reg),
+        .iov_base = &reg,
+        .iov_len = sizeof(reg),
     };
     long pt_err = sys_ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &iov);
     if (pt_err < 0) {
@@ -79,14 +82,54 @@ static int get_prot(Elf64_Word p_flags) {
   return prot;
 }
 
-struct pid_path {
+struct pid_path_fd {
   pid_t pid;
   const char *path;
+  int fd;
 };
 
 static int setregset(struct note *n, void *arg) {
-  struct pid_path *pp = arg;
-  return arch_setregset(pp->pid, n, pp->path);
+  struct pid_path_fd *ppf = arg;
+  return arch_setregset(ppf->pid, ppf->fd, n, ppf->path);
+}
+
+static int map_nt_file(struct nt_file *f, void *arg) {
+  (void)arg;
+  int fd = open(f->filename, O_RDONLY);
+  void *p;
+  if (fd == -1) {
+    p = mmap((void *)f->start, f->end - f->start,
+             PROT_READ | PROT_WRITE | PROT_EXEC,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  } else {
+    p = mmap((void *)f->start, f->end - f->start,
+             PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_FIXED, fd,
+             f->offset);
+  }
+  if (p == MAP_FAILED) {
+    fprintf(stderr, "mmap(%d %s) failed: errno=%d\n", fd, f->filename, errno);
+  }
+  if (fd != -1)
+    close(fd);
+  return p == MAP_FAILED ? -1 : 0;
+}
+
+struct path_fd {
+  const char *path;
+  int fd;
+};
+
+static int map_nt_files_from_note(struct note *n, void *arg) {
+  struct path_fd *pf = arg;
+  if (n->type == NT_FILE)
+    return for_each_nt_file(pf->path, pf->fd, n, map_nt_file, arg);
+  return 0;
+}
+
+static void map_nt_files(const char *path, int fd, Elf64_Ehdr *ehdr) {
+  struct path_fd pf = {.path = path, .fd = fd};
+  if (for_each_note(path, fd, ehdr, map_nt_files_from_note, &pf) == -1)
+    exit(EXIT_FAILURE);
 }
 
 static void map_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
@@ -116,7 +159,7 @@ static void map_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
   return;
 
 err:
-  exit(1);
+  exit(EXIT_FAILURE);
 }
 
 static void execore_1(int fd, char **gdb_argv, const char *core_path) {
@@ -146,11 +189,12 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
     goto err;
   }
   if (pid == 0) {
+    map_nt_files(core_path, fd, &ehdr);
     map_phdrs(core_path, fd, &ehdr);
     close(fd);
     sys_ptrace(PTRACE_TRACEME, 0, 0, 0);
     raise(SIGSTOP);
-    abort();
+    exit(EXIT_FAILURE);
   }
   int wstatus;
   int err = waitpid(pid, &wstatus, 0);
@@ -163,8 +207,8 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
     goto err_kill;
   }
 
-  struct pid_path pp = {.pid = pid, .path = core_path};
-  if (for_each_note(core_path, fd, &ehdr, setregset, &pp) == -1)
+  struct pid_path_fd ppf = {.pid = pid, .path = core_path, .fd = fd};
+  if (for_each_note(core_path, fd, &ehdr, setregset, &ppf) == -1)
     goto err_kill;
 
   long pt_err = sys_ptrace(PTRACE_DETACH, pid, 0, (void *)SIGSTOP);
