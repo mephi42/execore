@@ -78,6 +78,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 add_test_config(_ubsan -fsanitize=undefined -fsanitize=undefined)
 
+add_executable(phoenix test/phoenix.c)
+add_test(
+        NAME phoenix
+        COMMAND test/phoenix.test $<TARGET_FILE:execore> $<TARGET_FILE:phoenix>
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 #
 # Maintenance.
 #

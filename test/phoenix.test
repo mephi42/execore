@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e -u -x -o pipefail
+
+execore=$1
+shift
+phoenix=$1
+shift
+
+workdir=$(mktemp -d)
+trap 'rm -r "$workdir"' EXIT
+cd "$workdir"
+
+ulimit -c unlimited
+gdb "$phoenix" \
+  --batch \
+  --eval-command=run \
+  --eval-command=generate-core-file \
+  --eval-command=quit
+"$execore" "$(echo core.*)" \
+  --batch \
+  --eval-command='x/i $pc' \
+  --eval-command=continue \
+  --eval-command=quit | grep "I am alive!"
