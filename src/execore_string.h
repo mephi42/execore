@@ -2,7 +2,6 @@
 #define EXECORE_STRING_H
 
 #include "execore.h"
-#include <nolibc.h>
 
 static __attribute__((unused)) void *EXECORE_(memchr)(const void *s, int c,
                                                       size_t n) {

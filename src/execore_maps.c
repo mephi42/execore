@@ -1,7 +1,9 @@
+/* clang-format off */
+#include <nolibc.h>
+/* clang-format on */
 #include "execore_maps.h"
 #include "execore_stdlib.h"
 #include "execore_string.h"
-#include <nolibc.h>
 
 static ssize_t for_each_mapping_1(char *buf, char *end, const char *path,
                                   int lineno,
