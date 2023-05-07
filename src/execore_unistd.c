@@ -1,7 +1,9 @@
+/* clang-format off */
+#include <nolibc.h>
+/* clang-format on */
 #include "execore_unistd.h"
 #include "execore_string.h"
 #include <alloca.h>
-#include <nolibc.h>
 
 static const char *path_end(const char *p) {
   if (p == NULL)
@@ -50,4 +52,22 @@ int EXECORE_(execvpe)(const char *file, char *const argv[],
   if (local_errno != 0)
     errno = local_errno;
   return -1;
+}
+
+ssize_t pread_exact(int fd, void *buf, size_t count, off_t offset) {
+  size_t orig_count = count;
+  while (count != 0) {
+    ssize_t n_read = pread(fd, buf, count, offset);
+    if (n_read < 0) {
+      return -1;
+    }
+    if (n_read == 0) {
+      errno = EIO;
+      return -1;
+    }
+    buf += n_read;
+    count -= n_read;
+    offset += n_read;
+  }
+  return orig_count;
 }

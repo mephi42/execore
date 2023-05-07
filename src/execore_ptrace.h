@@ -1,8 +1,6 @@
 #ifndef EXECORE_PTRACE
 #define EXECORE_PTRACE
 
-#include <nolibc.h>
-
 struct iovec {
   void *iov_base;
   size_t iov_len;

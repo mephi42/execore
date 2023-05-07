@@ -8,6 +8,9 @@ set(CMAKE_C_STANDARD 11)
 
 set(SOURCES
         src/execore.c
+        src/execore.h
+        src/execore_elf.c
+        src/execore_elf.h
         src/execore_maps.c
         src/execore_maps.h
         src/execore_mman.h

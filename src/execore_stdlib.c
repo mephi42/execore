@@ -1,5 +1,7 @@
-#include "execore_stdlib.h"
+/* clang-format off */
 #include <nolibc.h>
+/* clang-format on */
+#include "execore_stdlib.h"
 
 static unsigned int parse_hex_digit(char c) {
   switch (c) {

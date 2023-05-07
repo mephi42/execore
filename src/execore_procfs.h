@@ -2,7 +2,6 @@
 #define EXECORE_PROCFS_H
 
 #include "execore_user.h"
-#include <nolibc.h>
 
 #if defined(__x86_64__)
 
