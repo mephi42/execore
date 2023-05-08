@@ -40,9 +40,9 @@ static ssize_t for_each_mapping_1(char *buf, char *end, const char *path,
   m.end = EXECORE_(strtoul)(p, &p, 16);
   EXPECT_CHAR(' ');
 
-  m.flags = EXPECT_EITHER_CHAR('-', 'r') ? PROT_READ : 0;
-  m.flags |= EXPECT_EITHER_CHAR('-', 'w') ? PROT_WRITE : 0;
-  m.flags |= EXPECT_EITHER_CHAR('-', 'x') ? PROT_EXEC : 0;
+  m.prot = EXPECT_EITHER_CHAR('-', 'r') ? PROT_READ : 0;
+  m.prot |= EXPECT_EITHER_CHAR('-', 'w') ? PROT_WRITE : 0;
+  m.prot |= EXPECT_EITHER_CHAR('-', 'x') ? PROT_EXEC : 0;
   m.p = EXPECT_EITHER_CHAR('s', 'p');
   EXPECT_CHAR(' ');
 
