@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12)
-project(execore)
+project(execore C)
 set(CMAKE_C_STANDARD 11)
 
 #
@@ -33,14 +33,18 @@ target_compile_options(execore PRIVATE
         -Wextra
         -Werror
 )
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
   target_compile_options(execore PRIVATE -Wno-unknown-attributes)
 endif()
 target_include_directories(execore PRIVATE src src/fakelibc src/nolibc)
+set(LDS ${CMAKE_SOURCE_DIR}/src/execore.lds)
 target_link_options(execore PRIVATE
         -nostdlib
         -static
+        -Wl,--build-id=none
+        -Wl,--script=${LDS}
 )
+set_target_properties(execore PROPERTIES LINK_DEPENDS ${LDS})
 target_link_libraries(execore gcc)
 
 #
@@ -73,7 +77,7 @@ endfunction()
 
 add_test_config("" "" "")
 add_test_config(_asan -fsanitize=address -fsanitize=address)
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
   add_test_config(_msan -fsanitize=memory -fsanitize=memory)
 endif()
 add_test_config(_ubsan -fsanitize=undefined -fsanitize=undefined)

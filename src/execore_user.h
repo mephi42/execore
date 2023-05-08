@@ -33,6 +33,8 @@ struct user_regs_struct {
   __extension__ unsigned long long int gs;
 };
 
+#elif defined(__s390x__)
+
 #else
 #error Unsupported architecture
 #endif

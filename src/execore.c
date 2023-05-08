@@ -36,30 +36,25 @@ static int arch_is_mappable_addr(void *p) {
   return (unsigned long)p != 0xffffffffff600000;
 }
 
-static int arch_setregset(pid_t pid, int fd, struct note *n,
-                          const char *core_path) {
-  if (strcmp(n->name, "CORE") == 0 && n->type == NT_PRSTATUS) {
-    if (n->desc_sz != (ssize_t)sizeof(struct elf_prstatus)) {
-      fprintf(stderr, "%s contains a bad NT_PRSTATUS\n", core_path);
-      goto err;
-    }
-    elf_gregset_t reg;
-    PREAD_EXACT(core_path, fd, &reg, sizeof(reg),
-                n->desc_off + offsetof(struct elf_prstatus, pr_reg), err);
-    struct iovec iov = {
-        .iov_base = &reg,
-        .iov_len = sizeof(reg),
-    };
-    long pt_err = sys_ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &iov);
-    if (pt_err < 0) {
-      fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
-      goto err;
-    }
-  }
-  return 0;
+#elif defined(__s390x__)
 
-err:
-  return -1;
+#define ARCH_EM EM_S390
+
+static __attribute__((noreturn)) void
+arch_switch_stack(void __attribute__((noreturn)) (*f)(void *), void *arg,
+                  void *stack) {
+  asm("lgr %%r15,%[stack]\n"
+      "lgr %%r2,%[arg]\n"
+      "br %[f]\n"
+      :
+      : [f] "a"(f), [arg] "r"(arg), [stack] "r"(stack)
+      : "r2", "memory");
+  __builtin_unreachable();
+}
+
+static int arch_is_mappable_addr(void *p) {
+  (void)p;
+  return 1;
 }
 
 #else
@@ -91,7 +86,50 @@ struct pid_path_fd {
 
 static int setregset(struct note *n, void *arg) {
   struct pid_path_fd *ppf = arg;
-  return arch_setregset(ppf->pid, ppf->fd, n, ppf->path);
+
+  if (strcmp(n->name, "CORE") == 0 && n->type == NT_PRSTATUS) {
+    if (n->desc_sz != (ssize_t)sizeof(struct elf_prstatus)) {
+      fprintf(stderr, "%s contains a bad NT_PRSTATUS\n", ppf->path);
+      goto err;
+    }
+    elf_gregset_t reg;
+    PREAD_EXACT(ppf->path, ppf->fd, &reg, sizeof(reg),
+                n->desc_off + offsetof(struct elf_prstatus, pr_reg), err);
+    struct iovec iov = {
+        .iov_base = &reg,
+        .iov_len = sizeof(reg),
+    };
+    long pt_err =
+        sys_ptrace(PTRACE_SETREGSET, ppf->pid, (void *)NT_PRSTATUS, &iov);
+    if (pt_err < 0) {
+      fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
+      goto err;
+    }
+  }
+  return 0;
+
+err:
+  return -1;
+}
+
+extern const char _execore_start[];
+extern const char _execore_end[];
+
+static int unmap_1(struct mapping *m, void *arg) {
+  (void)arg;
+  int is_self = m->start < (unsigned long)_execore_end &&
+                (unsigned long)_execore_start < m->end;
+  if (!is_self && arch_is_mappable_addr((void *)m->start)) {
+    if (munmap((void *)m->start, m->end - m->start) == -1) {
+      fprintf(stderr, "munmap(%p) failed: errno=%d\n", (void *)m->start, errno);
+      return -1;
+    }
+  }
+  return 0;
+}
+
+static int unmap_all(void) {
+  return for_each_mapping("/proc/self/maps", &unmap_1, NULL);
 }
 
 static int map_nt_file(struct nt_file *f, void *arg) {
@@ -190,6 +228,8 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
     goto err;
   }
   if (pid == 0) {
+    if (unmap_all() == -1)
+      exit(EXIT_FAILURE);
     map_nt_files(core_path, fd, &ehdr);
     map_phdrs(core_path, fd, &ehdr);
     close(fd);
@@ -231,30 +271,6 @@ err:
   return;
 }
 
-static int unmap_1(struct mapping *m, void *arg) {
-  struct stat *self = arg;
-  int is_self =
-      ((m->major << 8) | m->minor) == self->st_dev && m->inode == self->st_ino;
-  int is_bss = m->start < (unsigned long)(local_stack + sizeof(local_stack)) &&
-               m->end > (unsigned long)local_stack;
-  if (!is_self && !is_bss && arch_is_mappable_addr((void *)m->start)) {
-    if (munmap((void *)m->start, m->end - m->start) == -1) {
-      fprintf(stderr, "munmap(%p) failed: errno=%d\n", (void *)m->start, errno);
-      return -1;
-    }
-  }
-  return 0;
-}
-
-static int unmap_all(void) {
-  struct stat self;
-  if (stat("/proc/self/exe", &self) == -1) {
-    fprintf(stderr, "stat(/proc/self/exe) failed: errno=%d\n", errno);
-    return -1;
-  }
-  return for_each_mapping("/proc/self/maps", &unmap_1, &self);
-}
-
 struct argc_argv {
   int argc;
   char **argv;
@@ -284,9 +300,6 @@ static void __attribute__((noreturn)) execore(void *arg) {
   char **new_environ = alloca((environ_n + 1) * sizeof(char *));
   memcpy(new_environ, environ, (environ_n + 1) * sizeof(char *));
   environ = new_environ;
-
-  if (unmap_all() == -1)
-    goto err;
 
   int fd = open(core_path, O_RDONLY);
   if (fd == -1) {

@@ -9,6 +9,17 @@ __extension__ typedef unsigned long long elf_greg_t;
 #define ELF_NGREG (sizeof(struct user_regs_struct) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
+#elif defined(__s390x__)
+
+typedef unsigned long greg_t;
+#define __NGREG 27
+typedef greg_t gregset_t[__NGREG] __attribute__((__aligned__(8)));
+typedef gregset_t elf_gregset_t;
+
+#else
+#error Unsupported architecture
+#endif
+
 struct elf_siginfo {
   int si_signo;
   int si_code;
@@ -31,9 +42,5 @@ struct elf_prstatus {
   elf_gregset_t pr_reg;
   int pr_fpvalid;
 };
-
-#else
-#error Unsupported architecture
-#endif
 
 #endif

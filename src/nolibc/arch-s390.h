@@ -223,4 +223,7 @@ void *sys_mmap(void *addr, size_t length, int prot, int flags, int fd,
 	return (void *)my_syscall1(__NR_mmap, &args);
 }
 #define sys_mmap sys_mmap
+
+#define CONFIG_CLONE_BACKWARDS2
+
 #endif // _NOLIBC_ARCH_S390_H
