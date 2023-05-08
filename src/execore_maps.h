@@ -4,9 +4,7 @@
 struct mapping {
   unsigned long start;
   unsigned long end;
-  unsigned r : 1;
-  unsigned w : 1;
-  unsigned x : 1;
+  unsigned flags : 3;
   unsigned p : 1;
   unsigned long offset;
   unsigned long major;
