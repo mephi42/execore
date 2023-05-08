@@ -4,7 +4,7 @@
 struct mapping {
   unsigned long start;
   unsigned long end;
-  unsigned flags : 3;
+  unsigned prot : 3;
   unsigned p : 1;
   unsigned long offset;
   unsigned long major;
