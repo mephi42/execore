@@ -343,7 +343,11 @@ pid_t sys_fork(void)
 	 * have a different API, but most archs have the flags on first arg and
 	 * will not use the rest with no other flag.
 	 */
+#ifdef CONFIG_CLONE_BACKWARDS2
+	return my_syscall5(__NR_clone, 0, SIGCHLD, 0, 0, 0);
+#else
 	return my_syscall5(__NR_clone, SIGCHLD, 0, 0, 0, 0);
+#endif
 #elif defined(__NR_fork)
 	return my_syscall0(__NR_fork);
 #else
