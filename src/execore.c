@@ -163,13 +163,33 @@ static int unmap_all(void) {
   return for_each_mapping("/proc/self/maps", &unmap_1, NULL);
 }
 
+struct path_fd_sysroot {
+  const char *path;
+  int fd;
+  const char *sysroot;
+};
+
 #define PROT_RWX (PROT_READ | PROT_WRITE | PROT_EXEC)
 
 static int map_nt_file(struct nt_file *f, void *arg) {
-  (void)arg;
-  int fd = open(f->filename, O_RDONLY);
+  struct path_fd_sysroot *pfs = arg;
+  const char *filename;
+  if (pfs->sysroot == NULL) {
+    filename = f->filename;
+  } else {
+    size_t sysroot_len = strlen(pfs->sysroot);
+    size_t filename_len = strlen(f->filename);
+    char *buf = alloca(sysroot_len + filename_len + 1);
+    memcpy(buf, pfs->sysroot, sysroot_len);
+    memcpy(buf + sysroot_len, f->filename, filename_len + 1);
+    filename = buf;
+  }
+  int fd = open(filename, O_RDONLY);
   void *p;
   if (fd == -1) {
+    fprintf(stderr,
+            "Warning: could not open %s (errno=%d), mapping zeros at %p\n",
+            filename, errno, (void *)f->start);
     p = mmap((void *)f->start, f->end - f->start, PROT_RWX,
              MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
   } else {
@@ -177,28 +197,24 @@ static int map_nt_file(struct nt_file *f, void *arg) {
              MAP_PRIVATE | MAP_FIXED, fd, f->offset);
   }
   if (p == MAP_FAILED) {
-    fprintf(stderr, "mmap(%d %s) failed: errno=%d\n", fd, f->filename, errno);
+    fprintf(stderr, "mmap(%d %s) failed: errno=%d\n", fd, filename, errno);
   }
   if (fd != -1)
     close(fd);
   return p == MAP_FAILED ? -1 : 0;
 }
 
-struct path_fd {
-  const char *path;
-  int fd;
-};
-
 static int map_nt_files_from_note(struct note *n, void *arg) {
-  struct path_fd *pf = arg;
+  struct path_fd_sysroot *pfs = arg;
   if (n->type == NT_FILE)
-    return for_each_nt_file(pf->path, pf->fd, n, map_nt_file, arg);
+    return for_each_nt_file(pfs->path, pfs->fd, n, map_nt_file, arg);
   return 0;
 }
 
-static void map_nt_files(const char *path, int fd, Elf64_Ehdr *ehdr) {
-  struct path_fd pf = {.path = path, .fd = fd};
-  if (for_each_note(path, fd, ehdr, map_nt_files_from_note, &pf) == -1)
+static void map_nt_files(const char *path, int fd, const char *sysroot,
+                         Elf64_Ehdr *ehdr) {
+  struct path_fd_sysroot pfs = {.path = path, .fd = fd, .sysroot = sysroot};
+  if (for_each_note(path, fd, ehdr, map_nt_files_from_note, &pfs) == -1)
     exit(EXIT_FAILURE);
 }
 
@@ -244,6 +260,11 @@ static void map_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
     exit(EXIT_FAILURE);
 }
 
+struct path_fd {
+  const char *path;
+  int fd;
+};
+
 static int read_phdr(Elf64_Phdr *phdr, void *arg) {
   struct path_fd *pf = arg;
   PREAD_EXACT(pf->path, pf->fd, (void *)phdr->p_vaddr, phdr->p_filesz,
@@ -276,7 +297,8 @@ static void protect_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
     exit(EXIT_FAILURE);
 }
 
-static void execore_1(int fd, char **gdb_argv, const char *core_path) {
+static void execore_1(const char *core_path, int fd, const char *sysroot,
+                      char **gdb_argv) {
   Elf64_Ehdr ehdr;
   PREAD_EXACT(core_path, fd, &ehdr, sizeof(ehdr), 0, err);
   if (ehdr.e_ident[EI_MAG0] != ELFMAG0 || ehdr.e_ident[EI_MAG1] != ELFMAG1 ||
@@ -306,7 +328,7 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
     if (unmap_all() == -1)
       exit(EXIT_FAILURE);
     map_phdrs(core_path, fd, &ehdr);
-    map_nt_files(core_path, fd, &ehdr);
+    map_nt_files(core_path, fd, sysroot, &ehdr);
     read_phdrs(core_path, fd, &ehdr);
     protect_phdrs(core_path, fd, &ehdr);
     close(fd);
@@ -355,21 +377,42 @@ struct argc_argv {
 
 static void __attribute__((noreturn)) execore(void *arg) {
   struct argc_argv *aa = arg;
-  if (aa->argc < 2) {
-    fprintf(stderr, "Usage: %s CORE [GDB_ARG [GDB_ARG ...]]\n", aa->argv[0]);
+  char *core_path = NULL;
+  char *sysroot = NULL;
+  int argn = 1;
+  while (argn < aa->argc) {
+    if (strncmp(aa->argv[argn], "--sysroot=", 10) == 0) {
+      sysroot = strdupa(aa->argv[argn] + 10);
+      argn++;
+    } else if (core_path == NULL) {
+      core_path = strdupa(aa->argv[argn]);
+      argn++;
+    } else {
+      break;
+    }
+  }
+  if (core_path == NULL) {
+    fprintf(stderr, "Usage: %s [--sysroot=PATH] CORE [GDB_ARG [GDB_ARG ...]]\n",
+            aa->argv[0]);
     goto err;
   }
-  char *core_path = strdupa(aa->argv[1]);
 
-  char **gdb_argv = alloca((aa->argc + 4) * sizeof(char *));
-  gdb_argv[0] = "gdb";
-  gdb_argv[1] = "-p";
+  int gdb_argc = 5 + (aa->argc - argn);
+  char **gdb_argv = alloca((gdb_argc + 1) * sizeof(char *));
+  int gdb_argn = 0;
+  gdb_argv[gdb_argn++] = "gdb";
+  gdb_argv[gdb_argn++] = "-p";
+  gdb_argn++; /* real pid, filled by execore_1() */
   /* https://github.com/mephi42/gdb-pounce/blob/v0.0.16/gdb-pounce#L411 */
-  gdb_argv[3] = "-ex";
-  gdb_argv[4] = "handle SIGSTOP nostop noprint nopass";
-  for (int i = 2; i < aa->argc; i++)
-    gdb_argv[i + 3] = strdupa(aa->argv[i]);
-  gdb_argv[aa->argc + 3] = NULL;
+  gdb_argv[gdb_argn++] = "-ex";
+  gdb_argv[gdb_argn++] = "handle SIGSTOP nostop noprint nopass";
+  for (int i = argn; i < aa->argc; i++)
+    gdb_argv[gdb_argn++] = strdupa(aa->argv[i]);
+  if (gdb_argn != gdb_argc) {
+    fprintf(stderr, "Assertion error: gdb_argn != gdb_argc\n");
+    goto err;
+  }
+  gdb_argv[gdb_argn++] = NULL;
 
   size_t environ_n;
   for (environ_n = 0; environ[environ_n]; environ_n++)
@@ -384,7 +427,7 @@ static void __attribute__((noreturn)) execore(void *arg) {
     goto err;
   }
 
-  execore_1(fd, gdb_argv, core_path);
+  execore_1(core_path, fd, sysroot, gdb_argv);
 
   close(fd);
 err:
