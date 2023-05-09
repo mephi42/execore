@@ -132,18 +132,18 @@ static int unmap_all(void) {
   return for_each_mapping("/proc/self/maps", &unmap_1, NULL);
 }
 
+#define PROT_RWX (PROT_READ | PROT_WRITE | PROT_EXEC)
+
 static int map_nt_file(struct nt_file *f, void *arg) {
   (void)arg;
   int fd = open(f->filename, O_RDONLY);
   void *p;
   if (fd == -1) {
-    p = mmap((void *)f->start, f->end - f->start,
-             PROT_READ | PROT_WRITE | PROT_EXEC,
+    p = mmap((void *)f->start, f->end - f->start, PROT_RWX,
              MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
   } else {
-    p = mmap((void *)f->start, f->end - f->start,
-             PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_FIXED, fd,
-             f->offset);
+    p = mmap((void *)f->start, f->end - f->start, PROT_RWX,
+             MAP_PRIVATE | MAP_FIXED, fd, f->offset);
   }
   if (p == MAP_FAILED) {
     fprintf(stderr, "mmap(%d %s) failed: errno=%d\n", fd, f->filename, errno);
@@ -171,34 +171,78 @@ static void map_nt_files(const char *path, int fd, Elf64_Ehdr *ehdr) {
     exit(EXIT_FAILURE);
 }
 
-static void map_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
-  int i = 0;
-  for (; i < ehdr->e_phnum; i++) {
+static int for_each_mappable_phdr(const char *path, int fd, Elf64_Ehdr *ehdr,
+                                  int (*cb)(Elf64_Phdr *, void *), void *arg) {
+  for (int i = 0; i < ehdr->e_phnum; i++) {
     Elf64_Phdr phdr;
     PREAD_EXACT(path, fd, &phdr, sizeof(phdr), ehdr->e_phoff + sizeof(phdr) * i,
                 err);
     if (!is_mappable_phdr(&phdr))
       continue;
-    void *p = mmap((void *)phdr.p_vaddr, phdr.p_memsz, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-    if (p == MAP_FAILED) {
-      fprintf(stderr, "mmap(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n", path, i,
-              (void *)phdr.p_vaddr, (long)phdr.p_memsz, errno);
+    if (cb(&phdr, arg) == -1)
       goto err;
-    }
-    PREAD_EXACT(path, fd, (void *)phdr.p_vaddr, phdr.p_filesz, phdr.p_offset,
-                err);
-    if (mprotect((void *)phdr.p_vaddr, phdr.p_memsz, get_prot(phdr.p_flags)) ==
-        -1) {
-      fprintf(stderr, "mprotect(%s Phdr[%d]=%p, 0x%lx) failed: errno=%d\n",
-              path, i, (void *)phdr.p_vaddr, (long)phdr.p_memsz, errno);
-      goto err;
-    }
   }
-  return;
+  return 0;
 
 err:
-  exit(EXIT_FAILURE);
+  return -1;
+}
+
+#define PHDR_PAGE_ADDR(phdr) ((void *)((phdr)->p_vaddr & -0x1000UL))
+#define PHDR_PAGE_SIZE(phdr)                                                   \
+  ({                                                                           \
+    Elf64_Phdr *__phdr = (phdr);                                               \
+    ((__phdr->p_vaddr + __phdr->p_memsz + 0xFFFUL) & -0x1000UL) -              \
+        (__phdr->p_vaddr & -0x1000UL);                                         \
+  })
+
+static int map_phdr(Elf64_Phdr *phdr, void *arg) {
+  const char *path = arg;
+  void *p = mmap(PHDR_PAGE_ADDR(phdr), PHDR_PAGE_SIZE(phdr), PROT_RWX,
+                 MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  if (p == MAP_FAILED) {
+    fprintf(stderr, "mmap(%s %p, 0x%llx) failed: errno=%d\n", path,
+            PHDR_PAGE_ADDR(phdr), PHDR_PAGE_SIZE(phdr), errno);
+    return -1;
+  }
+  return 0;
+}
+
+static void map_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
+  if (for_each_mappable_phdr(path, fd, ehdr, map_phdr, (void *)path) == -1)
+    exit(EXIT_FAILURE);
+}
+
+static int read_phdr(Elf64_Phdr *phdr, void *arg) {
+  struct path_fd *pf = arg;
+  PREAD_EXACT(pf->path, pf->fd, (void *)phdr->p_vaddr, phdr->p_filesz,
+              phdr->p_offset, err);
+  return 0;
+
+err:
+  return -1;
+}
+
+static void read_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
+  struct path_fd pf = {.path = path, .fd = fd};
+  if (for_each_mappable_phdr(path, fd, ehdr, read_phdr, &pf) == -1)
+    exit(EXIT_FAILURE);
+}
+
+static int protect_phdr(Elf64_Phdr *phdr, void *arg) {
+  const char *path = arg;
+  if (mprotect(PHDR_PAGE_ADDR(phdr), PHDR_PAGE_SIZE(phdr),
+               get_prot(phdr->p_flags)) == -1) {
+    fprintf(stderr, "mprotect(%s %p, 0x%llx) failed: errno=%d\n", path,
+            PHDR_PAGE_ADDR(phdr), PHDR_PAGE_SIZE(phdr), errno);
+    return -1;
+  }
+  return 0;
+}
+
+static void protect_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
+  if (for_each_mappable_phdr(path, fd, ehdr, protect_phdr, (void *)path) == -1)
+    exit(EXIT_FAILURE);
 }
 
 static void execore_1(int fd, char **gdb_argv, const char *core_path) {
@@ -230,8 +274,10 @@ static void execore_1(int fd, char **gdb_argv, const char *core_path) {
   if (pid == 0) {
     if (unmap_all() == -1)
       exit(EXIT_FAILURE);
-    map_nt_files(core_path, fd, &ehdr);
     map_phdrs(core_path, fd, &ehdr);
+    map_nt_files(core_path, fd, &ehdr);
+    read_phdrs(core_path, fd, &ehdr);
+    protect_phdrs(core_path, fd, &ehdr);
     close(fd);
     sys_ptrace(PTRACE_TRACEME, 0, 0, 0);
     raise(SIGSTOP);
