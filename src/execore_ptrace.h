@@ -9,6 +9,7 @@ struct iovec {
 enum __ptrace_request {
   PTRACE_TRACEME = 0,
   PTRACE_DETACH = 17,
+  PTRACE_GETREGSET = 0x4204,
   PTRACE_SETREGSET = 0x4205,
 };
 
