@@ -36,6 +36,12 @@ static int arch_is_mappable_addr(void *p) {
   return (unsigned long)p != 0xffffffffff600000;
 }
 
+static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
+  (void)pid;
+  (void)reg;
+  return 0;
+}
+
 #elif defined(__s390x__)
 
 #define ARCH_EM EM_S390
@@ -55,6 +61,29 @@ arch_switch_stack(void __attribute__((noreturn)) (*f)(void *), void *arg,
 static int arch_is_mappable_addr(void *p) {
   (void)p;
   return 1;
+}
+
+#define PSW_MASK_CC 0x0000300000000000UL
+#define PSW_MASK_PM 0x00000F0000000000UL
+#define PSW_MASK_64 0x0000000100000000UL
+#define PSW_MASK_32 0x0000000080000000UL
+
+static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
+  elf_gregset_t cur;
+  struct iovec iov = {
+      .iov_base = &cur,
+      .iov_len = sizeof(cur),
+  };
+  long pt_err = sys_ptrace(PTRACE_GETREGSET, pid, (void *)NT_PRSTATUS, &iov);
+  if (pt_err < 0) {
+    fprintf(stderr, "PTRACE_GETREGSET failed: errno=%d\n", (int)-pt_err);
+    return -1;
+  }
+  unsigned long user_pswm_bits =
+      PSW_MASK_CC | PSW_MASK_PM | PSW_MASK_64 | PSW_MASK_32;
+  (*reg)[0] &= user_pswm_bits;
+  (*reg)[0] |= (cur[0] & ~user_pswm_bits);
+  return 0;
 }
 
 #else
@@ -95,6 +124,8 @@ static int setregset(struct note *n, void *arg) {
     elf_gregset_t reg;
     PREAD_EXACT(ppf->path, ppf->fd, &reg, sizeof(reg),
                 n->desc_off + offsetof(struct elf_prstatus, pr_reg), err);
+    if (arch_fixup_prstatus(ppf->pid, &reg) == -1)
+      goto err;
     struct iovec iov = {
         .iov_base = &reg,
         .iov_len = sizeof(reg),
