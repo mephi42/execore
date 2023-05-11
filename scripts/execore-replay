@@ -1,0 +1,40 @@
+#!/bin/sh
+# Usage: execore-replay execore.tar.gz
+set -e -u -x
+basedir=$(cd "$(dirname "$0")" && pwd)
+tgz=$1
+execore=$(command -v execore) || {
+    set +x
+    echo >&2
+    echo "Error: execore must be in \$PATH" >&2
+    echo >&2
+    exit 1
+}
+workdir=$(mktemp -d)
+trap 'rm -r "$workdir"' EXIT
+tar -C "$workdir" -xf "$tgz"
+trace0=$(find "$workdir" -name trace.0) || {
+    set +x
+    echo >&2
+    echo "Error: $tgz does not contain any traces" >&2
+    echo >&2
+    exit 1
+}
+pwd=$(pwd)
+cd "$(dirname "$trace0")"
+epoch=0
+while [ -e trace."$epoch" ]; do
+    max_insns=$(grep -c ^\\[ trace."$epoch")
+    "$execore" --sysroot="$workdir" core."$epoch" \
+        --batch \
+        --eval-command="source $basedir/execore-record.py" \
+        --eval-command="set pagination off" \
+        --eval-command="execore-replay $max_insns $epoch" \
+        --eval-command="quit"
+    epoch=$((epoch + 1))
+done
+i=0
+while [ "$i" -lt "$epoch" ]; do
+    colordiff -u trace."$i".r trace."$i" || true
+    i=$((i + 1))
+done >"$pwd"/execore.diff
