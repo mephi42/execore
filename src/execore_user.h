@@ -33,7 +33,37 @@ struct user_regs_struct {
   __extension__ unsigned long long int gs;
 };
 
+struct user_fpregs_struct {
+  unsigned short int cwd;
+  unsigned short int swd;
+  unsigned short int ftw;
+  unsigned short int fop;
+  __extension__ unsigned long long int rip;
+  __extension__ unsigned long long int rdp;
+  unsigned int mxcsr;
+  unsigned int mxcr_mask;
+  unsigned int st_space[32];
+  unsigned int xmm_space[64];
+  unsigned int padding[24];
+};
+
 #elif defined(__s390x__)
+
+#ifdef __USE_MISC
+#define __ctx(fld) fld
+#else
+#define __ctx(fld) __##fld
+#endif
+
+typedef union {
+  double __ctx(d);
+  float __ctx(f);
+} fpreg_t;
+
+typedef struct {
+  unsigned int __ctx(fpc);
+  fpreg_t __ctx(fprs)[16];
+} fpregset_t;
 
 #else
 #error Unsupported architecture

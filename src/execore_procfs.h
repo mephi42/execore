@@ -9,12 +9,17 @@ __extension__ typedef unsigned long long elf_greg_t;
 #define ELF_NGREG (sizeof(struct user_regs_struct) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
+typedef struct user_fpregs_struct elf_fpregset_t;
+
 #elif defined(__s390x__)
 
 typedef unsigned long greg_t;
 #define __NGREG 27
 typedef greg_t gregset_t[__NGREG] __attribute__((__aligned__(8)));
 typedef gregset_t elf_gregset_t;
+
+typedef fpreg_t elf_fpreg_t;
+typedef fpregset_t elf_fpregset_t;
 
 #else
 #error Unsupported architecture
