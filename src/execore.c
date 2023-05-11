@@ -126,17 +126,33 @@ static int setregset(struct note *n, void *arg) {
                 n->desc_off + offsetof(struct elf_prstatus, pr_reg), err);
     if (arch_fixup_prstatus(ppf->pid, &reg) == -1)
       goto err;
-    struct iovec iov = {
-        .iov_base = &reg,
-        .iov_len = sizeof(reg),
-    };
+    struct iovec iov = {.iov_base = &reg, .iov_len = sizeof(reg)};
     long pt_err =
         sys_ptrace(PTRACE_SETREGSET, ppf->pid, (void *)NT_PRSTATUS, &iov);
     if (pt_err < 0) {
       fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
       goto err;
     }
+    return 0;
   }
+
+  if (strcmp(n->name, "CORE") == 0 && n->type == NT_FPREGSET) {
+    if (n->desc_sz != (ssize_t)sizeof(elf_fpregset_t)) {
+      fprintf(stderr, "%s contains a bad NT_FPREGSET\n", ppf->path);
+      goto err;
+    }
+    elf_fpregset_t reg;
+    PREAD_EXACT(ppf->path, ppf->fd, &reg, sizeof(reg), n->desc_off, err);
+    struct iovec iov = {.iov_base = &reg, .iov_len = sizeof(reg)};
+    long pt_err =
+        sys_ptrace(PTRACE_SETREGSET, ppf->pid, (void *)NT_FPREGSET, &iov);
+    if (pt_err < 0) {
+      fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
+      goto err;
+    }
+    return 0;
+  }
+
   return 0;
 
 err:
