@@ -7,6 +7,7 @@ Saved execore.tar.gz
 """
 import os
 import tarfile
+from traceback import print_exc
 
 import gdb
 
@@ -127,13 +128,16 @@ class ExecoreRecord(gdb.Command):
                 epoch += 1
         finally:
             filename = "execore.tar.gz"
-            with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
-                for objfile_name in objfile_names:
-                    tf.add(objfile_name)
-                for i in range(epoch + 1):
-                    tf.add(os.path.join(os.getcwd(), "core.{}".format(i)))
-                    tf.add(os.path.join(os.getcwd(), "trace.{}".format(i)))
-            print("Saved {}".format(filename))
+            try:
+                with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
+                    for objfile_name in objfile_names:
+                        tf.add(objfile_name)
+                    for i in range(epoch + 1):
+                        tf.add(os.path.join(os.getcwd(), "core.{}".format(i)))
+                        tf.add(os.path.join(os.getcwd(), "trace.{}".format(i)))
+                print("Saved {}".format(filename))
+            except Exception:
+                print_exc()
 
 
 class ExecoreReplay(gdb.Command):
