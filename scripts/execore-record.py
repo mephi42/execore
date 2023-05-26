@@ -8,6 +8,8 @@ Saved execore.tar.gz
 import os
 import tarfile
 
+import gdb
+
 
 class S390X:
     PSW_MASK_CC = 0x0000300000000000

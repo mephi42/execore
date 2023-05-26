@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 2.8.12)
-project(execore C)
+cmake_policy(SET CMP0048 NEW)
+project(execore
+        VERSION 0.1
+        LANGUAGES C
+)
 set(CMAKE_C_STANDARD 11)
 
 #
@@ -86,6 +90,20 @@ add_executable(phoenix test/phoenix.c)
 add_test(
         NAME phoenix
         COMMAND test/phoenix.test $<TARGET_FILE:execore> $<TARGET_FILE:phoenix>
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+set(PYTHON_SOURCES scripts/execore-record.py)
+
+add_test(
+        NAME flake8
+        COMMAND flake8 ${PYTHON_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(
+        NAME black
+        COMMAND black --check ${PYTHON_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
