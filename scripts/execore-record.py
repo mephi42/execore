@@ -132,7 +132,7 @@ class ExecoreRecord(gdb.Command):
                 with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
                     for objfile_name in objfile_names:
                         tf.add(objfile_name)
-                    for i in range(epoch + 1):
+                    for i in range(epoch):
                         tf.add(os.path.join(os.getcwd(), "core.{}".format(i)))
                         tf.add(os.path.join(os.getcwd(), "trace.{}".format(i)))
                 print("Saved {}".format(filename))
