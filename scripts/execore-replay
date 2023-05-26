@@ -13,7 +13,9 @@ execore=$(command -v execore) || {
 workdir=$(mktemp -d)
 trap 'rm -r "$workdir"' EXIT
 tar -C "$workdir" -xf "$tgz"
-trace0=$(find "$workdir" -name trace.0) || {
+{
+    trace0=$(find "$workdir" -name trace.0) && [ -n "$trace0" ]
+} || {
     set +x
     echo >&2
     echo "Error: $tgz does not contain any traces" >&2
