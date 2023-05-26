@@ -15,8 +15,12 @@ cd "$workdir"
 gdb /bin/bash \
   --batch \
   --eval-command="source $source_dir/scripts/execore-record.py" \
+  --eval-command="starti" \
   --eval-command="execore-record 1000" \
   --eval-command=quit
+mkdir extracted
+tar -C extracted -xf execore.tar.gz
+[ "$(find extracted -name "trace.*" -print0 | xargs -0 cat | grep -c ^\\[)" = 1000 ]
 "$source_dir"/scripts/execore-replay execore.tar.gz
-[ -e execore.diff ]
+cat execore.diff
 [ ! -s execore.diff ]
