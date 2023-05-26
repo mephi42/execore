@@ -18,7 +18,7 @@ gdb "$phoenix" \
   --eval-command=quit
 "$execore" "$(echo core.*)" \
   --batch \
-  --eval-command='x/i $pc' \
+  --eval-command="x/i \$pc" \
   --eval-command=continue \
   --eval-command=quit | tee log
 grep "I am alive!" log >/dev/null

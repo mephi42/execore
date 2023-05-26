@@ -107,6 +107,18 @@ add_test(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+set(SHELL_SOURCES
+        scripts/execore-replay
+        test/phoenix.test
+        test/test_execvpe.sh
+)
+
+add_test(
+        NAME shellcheck
+        COMMAND shellcheck ${SHELL_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 #
 # Maintenance.
 #
