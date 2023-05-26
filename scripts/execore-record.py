@@ -78,6 +78,8 @@ class X86_64:
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
+        if reg == "$eflags":
+            reg_val |= 2
         return reg_val
 
 
