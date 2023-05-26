@@ -38,7 +38,7 @@ class S390X:
         "$r14",
         "$r15",
     ]
-    SYSCALL_INSN = "svc\t"
+    STOP_INSNS = ["svc\t"]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
@@ -74,7 +74,7 @@ class X86_64:
         "$fs",
         "$gs",
     ]
-    SYSCALL_INSN = "syscall \n"
+    STOP_INSNS = ["syscall ", "rdtsc "]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
@@ -123,10 +123,10 @@ class ExecoreRecord(gdb.Command):
                         dump_regs(fp, arch, epoch_insns)
                         insn = gdb.execute("x/i $pc", to_string=True)
                         gdb.execute("si")
-                        if arch.SYSCALL_INSN in insn:
-                            break
                         epoch_insns += 1
                         total_insns += 1
+                        if any(stop_insn in insn for stop_insn in arch.STOP_INSNS):
+                            break
                 epoch += 1
         finally:
             filename = "execore.tar.gz"
