@@ -46,7 +46,44 @@ class S390X:
         return reg_val
 
 
-ARCHES = {"s390:64-bit": S390X}
+class X86_64:
+    REGS = [
+        "$rax",
+        "$rbx",
+        "$rcx",
+        "$rdx",
+        "$rsi",
+        "$rdi",
+        "$rbp",
+        "$rsp",
+        "$r8",
+        "$r9",
+        "$r10",
+        "$r11",
+        "$r12",
+        "$r13",
+        "$r14",
+        "$r15",
+        "$rip",
+        "$eflags",
+        "$cs",
+        "$ss",
+        "$ds",
+        "$es",
+        "$fs",
+        "$gs",
+    ]
+    SYSCALL_INSN = "syscall \n"
+
+    @classmethod
+    def fixup_reg(cls, reg, reg_val):
+        return reg_val
+
+
+ARCHES = {
+    "s390:64-bit": S390X,
+    "i386:x86-64": X86_64,
+}
 
 
 def dump_regs(fp, arch, epoch_insns):
