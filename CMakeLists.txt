@@ -97,7 +97,7 @@ set(PYTHON_SOURCES scripts/execore-record.py)
 
 add_test(
         NAME flake8
-        COMMAND flake8 ${PYTHON_SOURCES}
+        COMMAND flake8 --max-line-length=88 ${PYTHON_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
