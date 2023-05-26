@@ -109,7 +109,9 @@ class ExecoreRecord(gdb.Command):
                 gdb.execute("generate-core-file core.{}".format(epoch))
                 for objfile in gdb.objfiles():
                     objfile_name = objfile.filename
-                    if objfile_name is None:
+                    if objfile_name is None or objfile_name.startswith(
+                        "system-supplied DSO at 0x"
+                    ):
                         continue
                     if objfile_name.startswith("target:"):
                         # Assume we share the filesystem with the target.
