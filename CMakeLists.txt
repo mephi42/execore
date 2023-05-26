@@ -110,12 +110,19 @@ add_test(
 set(SHELL_SOURCES
         scripts/execore-replay
         test/phoenix.test
+        test/record-replay.test
         test/test_execvpe.sh
 )
 
 add_test(
         NAME shellcheck
         COMMAND shellcheck ${SHELL_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(
+        NAME record-replay
+        COMMAND test/record-replay.test $<TARGET_FILE:execore>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 

@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e -u -x -o pipefail
+
+source_dir=$(cd "$(dirname "$0")"/.. && pwd)
+
+execore=$1
+shift
+execore_dir=$(cd "$(dirname "$execore")" && pwd)
+export PATH=$execore_dir:$PATH
+
+workdir=$(mktemp -d)
+trap 'rm -r "$workdir"' EXIT
+cd "$workdir"
+
+gdb /bin/bash \
+  --batch \
+  --eval-command="source $source_dir/scripts/execore-record.py" \
+  --eval-command="execore-record 1000" \
+  --eval-command=quit
+"$source_dir"/scripts/execore-replay execore.tar.gz
+[ -e execore.diff ]
+[ ! -s execore.diff ]
