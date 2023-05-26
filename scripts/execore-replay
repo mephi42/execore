@@ -11,7 +11,7 @@ execore=$(command -v execore) || {
     exit 1
 }
 workdir=$(mktemp -d)
-trap 'rm -r "$workdir"' EXIT
+trap 'rm -rf "$workdir"' EXIT
 tar -C "$workdir" -xf "$tgz"
 {
     trace0=$(find "$workdir" -name trace.0) && [ -n "$trace0" ]
