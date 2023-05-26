@@ -30,6 +30,7 @@ while [ -e trace."$epoch" ]; do
         --eval-command="source $basedir/execore-record.py" \
         --eval-command="set pagination off" \
         --eval-command="execore-replay $max_insns $epoch" \
+        --eval-command="kill" \
         --eval-command="quit"
     epoch=$((epoch + 1))
 done
