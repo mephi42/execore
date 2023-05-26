@@ -9,7 +9,7 @@ execore_dir=$(cd "$(dirname "$execore")" && pwd)
 export PATH=$execore_dir:$PATH
 
 workdir=$(mktemp -d)
-trap 'rm -r "$workdir"' EXIT
+trap 'rm -rf "$workdir"' EXIT
 cd "$workdir"
 
 gdb /bin/bash \

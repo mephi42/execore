@@ -7,7 +7,7 @@ phoenix=$1
 shift
 
 workdir=$(mktemp -d)
-trap 'rm -r "$workdir"' EXIT
+trap 'rm -rf "$workdir"' EXIT
 cd "$workdir"
 
 ulimit -c unlimited
