@@ -127,7 +127,7 @@ class ExecoreRecord(gdb.Command):
                 epoch += 1
         finally:
             filename = "execore.tar.gz"
-            with tarfile.open(filename, "w:gz") as tf:
+            with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
                 for objfile_name in objfile_names:
                     tf.add(objfile_name)
                 for i in range(epoch + 1):
