@@ -7,7 +7,6 @@ Saved execore.tar.gz
 """
 import os
 import tarfile
-from traceback import print_exc
 
 import gdb
 
@@ -106,9 +105,13 @@ class ExecoreRecord(gdb.Command):
         total_insns = 0
         epoch = 0
         objfile_names = set()
-        try:
+        filename = "execore.tar.gz"
+        with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
             while total_insns < max_insns:
-                gdb.execute("generate-core-file core.{}".format(epoch))
+                core_path = os.path.join(os.getcwd(), "core.{}".format(epoch))
+                gdb.execute("generate-core-file {}".format(core_path))
+                tf.add(core_path)
+                os.unlink(core_path)
                 for objfile in gdb.objfiles():
                     objfile_name = objfile.filename
                     if objfile_name is None or objfile_name.startswith(
@@ -119,7 +122,8 @@ class ExecoreRecord(gdb.Command):
                         # Assume we share the filesystem with the target.
                         objfile_name = objfile_name[7:]
                     objfile_names.add(objfile_name)
-                with open("trace.{}".format(epoch), "w") as fp:
+                trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
+                with open(trace_path, "w") as fp:
                     epoch_insns = 0
                     while total_insns < max_insns:
                         dump_regs(fp, arch, epoch_insns)
@@ -129,19 +133,12 @@ class ExecoreRecord(gdb.Command):
                         total_insns += 1
                         if any(stop_insn in insn for stop_insn in arch.STOP_INSNS):
                             break
+                tf.add(trace_path)
+                os.unlink(trace_path)
                 epoch += 1
-        finally:
-            filename = "execore.tar.gz"
-            try:
-                with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
-                    for objfile_name in objfile_names:
-                        tf.add(objfile_name)
-                    for i in range(epoch):
-                        tf.add(os.path.join(os.getcwd(), "core.{}".format(i)))
-                        tf.add(os.path.join(os.getcwd(), "trace.{}".format(i)))
-                print("Saved {}".format(filename))
-            except Exception:
-                print_exc()
+            for objfile_name in objfile_names:
+                tf.add(objfile_name)
+            print("Saved {}".format(filename))
 
 
 class ExecoreReplay(gdb.Command):
