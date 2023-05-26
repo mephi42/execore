@@ -41,3 +41,14 @@ while [ "$i" -lt "$epoch" ]; do
     colordiff --unified=30 trace."$i".r trace."$i" || true
     i=$((i + 1))
 done >"$pwd"/execore.diff
+set +x
+if [ -s "$pwd"/execore.diff ]; then
+    echo >&2
+    echo "Traces do not match, check $pwd/execore.diff" >&2
+    echo >&2
+    exit 1
+else
+    echo >&2
+    echo "Traces match" >&2
+    echo >&2
+fi
