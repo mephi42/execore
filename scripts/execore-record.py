@@ -135,9 +135,6 @@ class ExecoreRecord(gdb.Command):
                         "system-supplied DSO at 0x"
                     ):
                         continue
-                    if objfile_name.startswith("target:"):
-                        # Assume we share the filesystem with the target.
-                        objfile_name = objfile_name[7:]
                     objfile_names.add(objfile_name)
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
                 total_insns, _ = record_epoch(trace_path, arch, total_insns, max_insns)
