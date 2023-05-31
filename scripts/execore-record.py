@@ -210,6 +210,9 @@ class ExecoreRecordReplay(gdb.Command):
                 if diff_status != 0:
                     print("\nTraces do not match\n")
                     return
+                os.unlink(core_path)
+                os.unlink(trace_path)
+                os.unlink(replay_path)
                 epoch += 1
         print("\nTraces match\n")
 
