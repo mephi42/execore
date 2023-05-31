@@ -30,10 +30,7 @@ while [ -e trace."$epoch" ]; do
     "$execore" --sysroot="$workdir" core."$epoch" \
         --batch \
         --eval-command="source $basedir/execore-record.py" \
-        --eval-command="set pagination off" \
-        --eval-command="execore-replay $max_insns $epoch" \
-        --eval-command="kill" \
-        --eval-command="quit"
+        --eval-command="execore-replay $max_insns $epoch"
     epoch=$((epoch + 1))
 done
 i=0

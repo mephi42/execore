@@ -5,8 +5,11 @@
 (gdb) execore-record 20000
 Saved execore.tar.gz
 """
+import inspect
 import os
+import subprocess
 import tarfile
+import tempfile
 
 import gdb
 
@@ -95,6 +98,20 @@ def dump_regs(fp, arch, epoch_insns):
         fp.write("{}=0x{:x}\n".format(reg, reg_val))
 
 
+def record_epoch(trace_path, arch, total_insns, max_insns):
+    with open(trace_path, "w") as fp:
+        epoch_insns = 0
+        while total_insns < max_insns:
+            dump_regs(fp, arch, epoch_insns)
+            insn = gdb.execute("x/i $pc", to_string=True)
+            gdb.execute("si")
+            epoch_insns += 1
+            total_insns += 1
+            if any(stop_insn in insn for stop_insn in arch.STOP_INSNS):
+                break
+    return total_insns, epoch_insns
+
+
 class ExecoreRecord(gdb.Command):
     def __init__(self):
         super(ExecoreRecord, self).__init__("execore-record", gdb.COMMAND_USER)
@@ -123,16 +140,7 @@ class ExecoreRecord(gdb.Command):
                         objfile_name = objfile_name[7:]
                     objfile_names.add(objfile_name)
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
-                with open(trace_path, "w") as fp:
-                    epoch_insns = 0
-                    while total_insns < max_insns:
-                        dump_regs(fp, arch, epoch_insns)
-                        insn = gdb.execute("x/i $pc", to_string=True)
-                        gdb.execute("si")
-                        epoch_insns += 1
-                        total_insns += 1
-                        if any(stop_insn in insn for stop_insn in arch.STOP_INSNS):
-                            break
+                total_insns, _ = record_epoch(trace_path, arch, total_insns, max_insns)
                 tf.add(trace_path)
                 os.unlink(trace_path)
                 epoch += 1
@@ -150,13 +158,62 @@ class ExecoreReplay(gdb.Command):
         max_insns = int(max_insns)
         epoch = int(epoch)
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
+        gdb.execute("set pagination off")
         with open("trace.{}.r".format(epoch), "w") as fp:
             epoch_insns = 0
             while epoch_insns < max_insns:
                 dump_regs(fp, arch, epoch_insns)
                 gdb.execute("si")
                 epoch_insns += 1
+        gdb.execute("kill")
+        gdb.execute("quit")
+
+
+class ExecoreRecordReplay(gdb.Command):
+    def __init__(self):
+        super(ExecoreRecordReplay, self).__init__(
+            "execore-record-replay", gdb.COMMAND_USER
+        )
+
+    def invoke(self, arg, from_tty):
+        max_insns = int(arg)
+        arch = ARCHES[gdb.selected_inferior().architecture().name()]
+        with tempfile.TemporaryDirectory() as workdir:
+            total_insns = 0
+            epoch = 0
+            while total_insns < max_insns:
+                core_path = os.path.join(workdir, "core.{}".format(epoch))
+                gdb.execute("generate-core-file {}".format(core_path))
+                trace_path = os.path.join(workdir, "trace.{}".format(epoch))
+                total_insns, epoch_insns = record_epoch(
+                    trace_path, arch, total_insns, max_insns
+                )
+                subprocess.check_call(
+                    [
+                        "execore",
+                        core_path,
+                        "--batch",
+                        # https://stackoverflow.com/a/53293924
+                        "--eval-command=source {}".format(
+                            inspect.getfile(lambda: None)
+                        ),
+                        "--eval-command=execore-replay {} {}".format(
+                            epoch_insns, epoch
+                        ),
+                    ],
+                    cwd=workdir,
+                )
+                replay_path = os.path.join(workdir, "trace.{}.r".format(epoch))
+                diff_status = subprocess.call(
+                    ["colordiff", "--unified=30", replay_path, trace_path]
+                )
+                if diff_status != 0:
+                    print("\nTraces do not match\n")
+                    return
+                epoch += 1
+        print("\nTraces match\n")
 
 
 ExecoreRecord()
 ExecoreReplay()
+ExecoreRecordReplay()
