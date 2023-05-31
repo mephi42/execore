@@ -137,7 +137,8 @@ add_test(
 #
 
 add_custom_target(fmt
-        COMMAND clang-format -i ${SOURCES} ${TEST_SOURCES}
+        COMMAND clang-format -i ${SOURCES} ${TEST_SOURCES} &&
+                black ${PYTHON_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
