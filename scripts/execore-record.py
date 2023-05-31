@@ -195,7 +195,7 @@ class ExecoreRecordReplay(gdb.Command):
                         "--batch",
                         # https://stackoverflow.com/a/53293924
                         "--eval-command=source {}".format(
-                            inspect.getfile(lambda: None)
+                            os.path.realpath(inspect.getfile(lambda: None))
                         ),
                         "--eval-command=execore-replay {} {}".format(
                             epoch_insns, epoch
