@@ -40,7 +40,7 @@ class S390X:
         "$r14",
         "$r15",
     ]
-    STOP_INSNS = ["svc\t"]
+    STOP_INSNS = ["stck\t", "stckf\t", "svc\t"]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
