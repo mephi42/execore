@@ -93,6 +93,12 @@ add_test(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+add_test(
+        NAME clang-format
+        COMMAND clang-format --dry-run -Werror ${SOURCES} ${TEST_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 set(PYTHON_SOURCES scripts/execore-record.py)
 
 add_test(
