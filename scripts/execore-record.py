@@ -108,24 +108,32 @@ ARCHES = {
 
 
 def dump_regs(fp, arch, epoch_insns):
-    fp.write("[{}]\n".format(epoch_insns))
-    for reg in arch.REGS:
-        reg_val = arch.fixup_reg(reg, int(gdb.parse_and_eval(reg)))
-        fp.write("{}=0x{:x}\n".format(reg, reg_val))
+    try:
+        s = "[{}]\n".format(epoch_insns)
+        for reg in arch.REGS:
+            reg_val = arch.fixup_reg(reg, int(gdb.parse_and_eval(reg)))
+            s += "{}=0x{:x}\n".format(reg, reg_val)
+    except gdb.error:
+        return False
+    fp.write(s)
+    return True
 
 
 def record_epoch(trace_path, arch, total_insns, max_insns):
+    proceed = True
     with open(trace_path, "w") as fp:
         epoch_insns = 0
         while total_insns < max_insns:
-            dump_regs(fp, arch, epoch_insns)
+            if not dump_regs(fp, arch, epoch_insns):
+                proceed = False
+                break
             insn = gdb.execute("x/i $pc", to_string=True)
             gdb.execute("si")
             epoch_insns += 1
             total_insns += 1
             if any(stop_insn in insn for stop_insn in arch.STOP_INSNS):
                 break
-    return total_insns, epoch_insns
+    return total_insns, epoch_insns, proceed
 
 
 class ExecoreRecord(gdb.Command):
@@ -153,10 +161,14 @@ class ExecoreRecord(gdb.Command):
                         continue
                     objfile_names.add(os.path.realpath(objfile_name))
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
-                total_insns, _ = record_epoch(trace_path, arch, total_insns, max_insns)
+                total_insns, _, proceed = record_epoch(
+                    trace_path, arch, total_insns, max_insns
+                )
                 tf.add(trace_path)
                 os.unlink(trace_path)
                 epoch += 1
+                if not proceed:
+                    break
             for objfile_name in objfile_names:
                 tf.add(objfile_name)
             print("Saved {}".format(filename))
@@ -198,7 +210,7 @@ class ExecoreRecordReplay(gdb.Command):
                 core_path = os.path.join(workdir, "core.{}".format(epoch))
                 gdb.execute("generate-core-file {}".format(core_path))
                 trace_path = os.path.join(workdir, "trace.{}".format(epoch))
-                total_insns, epoch_insns = record_epoch(
+                total_insns, epoch_insns, proceed = record_epoch(
                     trace_path, arch, total_insns, max_insns
                 )
                 subprocess.check_call(
@@ -227,6 +239,8 @@ class ExecoreRecordReplay(gdb.Command):
                 os.unlink(trace_path)
                 os.unlink(replay_path)
                 epoch += 1
+                if not proceed:
+                    break
         print("\nTraces match\n")
 
 
