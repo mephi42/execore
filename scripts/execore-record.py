@@ -39,6 +39,22 @@ class S390X:
         "$r13",
         "$r14",
         "$r15",
+        "$f0",
+        "$f1",
+        "$f2",
+        "$f3",
+        "$f4",
+        "$f5",
+        "$f6",
+        "$f7",
+        "$f8",
+        "$f9",
+        "$f10",
+        "$f11",
+        "$f12",
+        "$f13",
+        "$f14",
+        "$f15",
     ]
     STOP_INSNS = ["stck\t", "stckf\t", "stfle\t", "svc\t"]
 
@@ -202,7 +218,7 @@ class ExecoreRecordReplay(gdb.Command):
                 )
                 replay_path = os.path.join(workdir, "trace.{}.r".format(epoch))
                 diff_status = subprocess.call(
-                    ["colordiff", "--unified=30", replay_path, trace_path]
+                    ["colordiff", "--unified=50", replay_path, trace_path]
                 )
                 if diff_status != 0:
                     print("\nTraces do not match\n")

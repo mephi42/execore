@@ -35,7 +35,7 @@ while [ -e trace."$epoch" ]; do
 done
 i=0
 while [ "$i" -lt "$epoch" ]; do
-    colordiff --unified=30 trace."$i".r trace."$i" || true
+    colordiff --unified=50 trace."$i".r trace."$i" || true
     i=$((i + 1))
 done >"$pwd"/execore.diff
 set +x
