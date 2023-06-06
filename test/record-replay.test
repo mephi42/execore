@@ -5,6 +5,8 @@ source_dir=$(cd "$(dirname "$0")"/.. && pwd)
 
 execore=$1
 shift
+phoenix=$1
+shift
 execore_dir=$(cd "$(dirname "$execore")" && pwd)
 export PATH=$execore_dir:$PATH
 
@@ -12,7 +14,7 @@ workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 cd "$workdir"
 
-gdb /bin/bash \
+gdb "$phoenix" \
   --batch \
   --eval-command="source $source_dir/scripts/execore-record.py" \
   --eval-command="starti" \
@@ -25,7 +27,7 @@ tar -C extracted -xf execore.tar.gz
 cat execore.diff
 [ ! -s execore.diff ]
 
-gdb /bin/bash \
+gdb "$phoenix" \
   --batch \
   --eval-command="source $source_dir/scripts/execore-record.py" \
   --eval-command="starti" \
