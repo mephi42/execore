@@ -149,7 +149,10 @@ class ExecoreRecord(gdb.Command):
         with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
             while total_insns < max_insns:
                 core_path = os.path.join(os.getcwd(), "core.{}".format(epoch))
-                gdb.execute("generate-core-file {}".format(core_path))
+                try:
+                    gdb.execute("generate-core-file {}".format(core_path))
+                except gdb.error:
+                    break
                 tf.add(core_path)
                 os.unlink(core_path)
                 for objfile in gdb.objfiles():
@@ -206,7 +209,10 @@ class ExecoreRecordReplay(gdb.Command):
         epoch = 0
         while total_insns < max_insns:
             core_path = "core.{}".format(epoch)
-            gdb.execute("generate-core-file {}".format(core_path))
+            try:
+                gdb.execute("generate-core-file {}".format(core_path))
+            except gdb.error:
+                break
             trace_path = "trace.{}".format(epoch)
             total_insns, epoch_insns, proceed = record_epoch(
                 trace_path, arch, total_insns, max_insns
