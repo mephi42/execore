@@ -9,7 +9,6 @@ import inspect
 import os
 import subprocess
 import tarfile
-import tempfile
 
 import gdb
 
@@ -203,44 +202,44 @@ class ExecoreRecordReplay(gdb.Command):
     def invoke(self, arg, from_tty):
         max_insns = int(arg)
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
-        with tempfile.TemporaryDirectory() as workdir:
-            total_insns = 0
-            epoch = 0
-            while total_insns < max_insns:
-                core_path = os.path.join(workdir, "core.{}".format(epoch))
-                gdb.execute("generate-core-file {}".format(core_path))
-                trace_path = os.path.join(workdir, "trace.{}".format(epoch))
-                total_insns, epoch_insns, proceed = record_epoch(
-                    trace_path, arch, total_insns, max_insns
+        total_insns = 0
+        epoch = 0
+        while total_insns < max_insns:
+            core_path = "core.{}".format(epoch)
+            gdb.execute("generate-core-file {}".format(core_path))
+            trace_path = "trace.{}".format(epoch)
+            total_insns, epoch_insns, proceed = record_epoch(
+                trace_path, arch, total_insns, max_insns
+            )
+            subprocess.check_call(
+                [
+                    "execore",
+                    core_path,
+                    "--batch",
+                    # https://stackoverflow.com/a/53293924
+                    "--eval-command=source {}".format(
+                        os.path.realpath(inspect.getfile(lambda: None))
+                    ),
+                    "--eval-command=execore-replay {} {}".format(epoch_insns, epoch),
+                ],
+            )
+            replay_path = "trace.{}.r".format(epoch)
+            diff_status = subprocess.call(
+                ["colordiff", "--unified=50", replay_path, trace_path]
+            )
+            if diff_status != 0:
+                print(
+                    "\nTraces do not match, check {}, {} and {}\n".format(
+                        core_path, trace_path, replay_path
+                    )
                 )
-                subprocess.check_call(
-                    [
-                        "execore",
-                        core_path,
-                        "--batch",
-                        # https://stackoverflow.com/a/53293924
-                        "--eval-command=source {}".format(
-                            os.path.realpath(inspect.getfile(lambda: None))
-                        ),
-                        "--eval-command=execore-replay {} {}".format(
-                            epoch_insns, epoch
-                        ),
-                    ],
-                    cwd=workdir,
-                )
-                replay_path = os.path.join(workdir, "trace.{}.r".format(epoch))
-                diff_status = subprocess.call(
-                    ["colordiff", "--unified=50", replay_path, trace_path]
-                )
-                if diff_status != 0:
-                    print("\nTraces do not match\n")
-                    return
-                os.unlink(core_path)
-                os.unlink(trace_path)
-                os.unlink(replay_path)
-                epoch += 1
-                if not proceed:
-                    break
+                return
+            os.unlink(core_path)
+            os.unlink(trace_path)
+            os.unlink(replay_path)
+            epoch += 1
+            if not proceed:
+                break
         print("\nTraces match\n")
 
 
