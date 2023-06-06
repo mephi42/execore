@@ -128,7 +128,7 @@ add_test(
 
 add_test(
         NAME record-replay
-        COMMAND test/record-replay.test $<TARGET_FILE:execore>
+        COMMAND test/record-replay.test $<TARGET_FILE:execore> $<TARGET_FILE:phoenix>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
