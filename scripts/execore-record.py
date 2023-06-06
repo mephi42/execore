@@ -151,7 +151,7 @@ class ExecoreRecord(gdb.Command):
                         "system-supplied DSO at 0x"
                     ):
                         continue
-                    objfile_names.add(objfile_name)
+                    objfile_names.add(os.path.realpath(objfile_name))
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
                 total_insns, _ = record_epoch(trace_path, arch, total_insns, max_insns)
                 tf.add(trace_path)
