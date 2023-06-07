@@ -5,10 +5,14 @@
 (gdb) execore-record 20000
 Saved execore.tar.gz
 """
+import argparse
+import contextlib
 import inspect
 import os
+import shlex
 import subprocess
 import tarfile
+import uuid
 
 import gdb
 
@@ -135,6 +139,14 @@ def record_epoch(trace_path, arch, total_insns, max_insns):
     return total_insns, epoch_insns, proceed
 
 
+def iter_objfile_names():
+    for objfile in gdb.objfiles():
+        objfile_name = objfile.filename
+        if objfile_name is None or objfile_name.startswith("system-supplied DSO at 0x"):
+            continue
+        yield os.path.realpath(objfile_name)
+
+
 class ExecoreRecord(gdb.Command):
     def __init__(self):
         super(ExecoreRecord, self).__init__("execore-record", gdb.COMMAND_USER)
@@ -155,13 +167,7 @@ class ExecoreRecord(gdb.Command):
                     break
                 tf.add(core_path)
                 os.unlink(core_path)
-                for objfile in gdb.objfiles():
-                    objfile_name = objfile.filename
-                    if objfile_name is None or objfile_name.startswith(
-                        "system-supplied DSO at 0x"
-                    ):
-                        continue
-                    objfile_names.add(os.path.realpath(objfile_name))
+                objfile_names.update(iter_objfile_names())
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
                 total_insns, _, proceed = record_epoch(
                     trace_path, arch, total_insns, max_insns
@@ -181,19 +187,52 @@ class ExecoreReplay(gdb.Command):
         super(ExecoreReplay, self).__init__("execore-replay", gdb.COMMAND_USER)
 
     def invoke(self, arg, from_tty):
-        max_insns, epoch = arg.split()
-        max_insns = int(max_insns)
-        epoch = int(epoch)
+        parser = argparse.ArgumentParser()
+        parser.add_argument("max_insns", type=int)
+        parser.add_argument("epoch", type=int)
+        args = parser.parse_args(shlex.split(arg))
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         gdb.execute("set pagination off")
-        with open("trace.{}.r".format(epoch), "w") as fp:
+        with open("trace.{}.r".format(args.epoch), "w") as fp:
             epoch_insns = 0
-            while epoch_insns < max_insns:
+            while epoch_insns < args.max_insns:
                 dump_regs(fp, arch, epoch_insns)
                 gdb.execute("si")
                 epoch_insns += 1
         gdb.execute("kill")
         gdb.execute("quit")
+
+
+def this_file():
+    # https://stackoverflow.com/a/53293924
+    return os.path.realpath(inspect.getfile(lambda: None))
+
+
+def check_call(argv):
+    print("$ {}".format(shlex.join(argv)))
+    subprocess.check_call(argv)
+
+
+def ssh(remote, *args):
+    check_call(["ssh", remote, *args])
+
+
+def rsync(*args):
+    check_call(["rsync", "-avz", *args])
+
+
+@contextlib.contextmanager
+def temporary_remote_directory(remote):
+    if remote is None:
+        yield None
+        return
+    try:
+        remote_dir = "/tmp/{}".format(uuid.uuid4())
+        ssh(remote, "mkdir", "-p", "{}/sysroot".format(remote_dir))
+        rsync(this_file(), "{}:{}/".format(remote, remote_dir))
+        yield remote_dir
+    finally:
+        ssh(remote, "rm", "-r", remote_dir)
 
 
 class ExecoreRecordReplay(gdb.Command):
@@ -203,50 +242,89 @@ class ExecoreRecordReplay(gdb.Command):
         )
 
     def invoke(self, arg, from_tty):
-        max_insns = int(arg)
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--remote")
+        parser.add_argument("--execore", default="execore")
+        parser.add_argument("max_insns", type=int)
+        args = parser.parse_args(shlex.split(arg))
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
-        total_insns = 0
-        epoch = 0
-        while total_insns < max_insns:
-            core_path = "core.{}".format(epoch)
-            try:
-                gdb.execute("generate-core-file {}".format(core_path))
-            except gdb.error:
-                break
-            trace_path = "trace.{}".format(epoch)
-            total_insns, epoch_insns, proceed = record_epoch(
-                trace_path, arch, total_insns, max_insns
-            )
-            subprocess.check_call(
-                [
-                    "execore",
-                    core_path,
-                    "--batch",
-                    # https://stackoverflow.com/a/53293924
-                    "--eval-command=source {}".format(
-                        os.path.realpath(inspect.getfile(lambda: None))
-                    ),
-                    "--eval-command=execore-replay {} {}".format(epoch_insns, epoch),
-                ],
-            )
-            replay_path = "trace.{}.r".format(epoch)
-            diff_status = subprocess.call(
-                ["colordiff", "--unified=50", replay_path, trace_path]
-            )
-            if diff_status != 0:
-                print(
-                    "\nTraces do not match, check {}, {} and {}\n".format(
-                        core_path, trace_path, replay_path
-                    )
+
+        with temporary_remote_directory(args.remote) as remote_dir:
+            total_insns = 0
+            epoch = 0
+            while total_insns < args.max_insns:
+                core_path = "core.{}".format(epoch)
+                try:
+                    gdb.execute("generate-core-file {}".format(core_path))
+                except gdb.error:
+                    break
+                trace_path = "trace.{}".format(epoch)
+                total_insns, epoch_insns, proceed = record_epoch(
+                    trace_path, arch, total_insns, args.max_insns
                 )
-                return
-            os.unlink(core_path)
-            os.unlink(trace_path)
-            os.unlink(replay_path)
-            epoch += 1
-            if not proceed:
-                break
-        print("\nTraces match\n")
+
+                replay_path = "trace.{}.r".format(epoch)
+                if remote_dir is None:
+                    check_call(
+                        [
+                            args.execore,
+                            core_path,
+                            "--batch",
+                            "--eval-command=source {}".format(this_file()),
+                            "--eval-command=execore-replay {} {}".format(
+                                epoch_insns, epoch
+                            ),
+                        ],
+                    )
+                else:
+                    rsync(core_path, "{}:{}/core.0".format(args.remote, remote_dir))
+                    rsync(
+                        "-R",
+                        *iter_objfile_names(),
+                        "{}:{}/sysroot".format(args.remote, remote_dir)
+                    )
+                    ssh(
+                        args.remote,
+                        " && ".join(
+                            (
+                                shlex.join(["cd", remote_dir]),
+                                shlex.join(
+                                    [
+                                        args.execore,
+                                        "--sysroot=sysroot",
+                                        "core.0",
+                                        "--batch",
+                                        "--eval-command=source {}".format(
+                                            os.path.basename(this_file())
+                                        ),
+                                        "--eval-command=execore-replay {} 0".format(
+                                            epoch_insns
+                                        ),
+                                    ]
+                                ),
+                            )
+                        ),
+                    )
+                    remote_replay_path = "{}/trace.0.r".format(remote_dir)
+                    rsync("{}:{}".format(args.remote, remote_replay_path), replay_path)
+                    ssh(args.remote, "rm", remote_replay_path)
+
+                try:
+                    check_call(["colordiff", "--unified=50", replay_path, trace_path])
+                except subprocess.CalledProcessError:
+                    print(
+                        "\nTraces do not match, check {}, {} and {}\n".format(
+                            core_path, trace_path, replay_path
+                        )
+                    )
+                    return
+                os.unlink(core_path)
+                os.unlink(trace_path)
+                os.unlink(replay_path)
+                epoch += 1
+                if not proceed:
+                    break
+            print("\nTraces match\n")
 
 
 ExecoreRecord()
