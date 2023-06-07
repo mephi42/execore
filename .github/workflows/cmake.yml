@@ -19,6 +19,12 @@ jobs:
     - name: Install packages
       run: sudo apt-get install -y black colordiff flake8 gdb shellcheck
 
+    - name: Allow ssh localhost
+      run: mkdir -m 700 -p ~/.ssh &&
+           ssh-keygen -t ecdsa -f ~/.ssh/id_ecdsa -N "" &&
+           cat ~/.ssh/id_ecdsa.pub >>~/.ssh/authorized_keys &&
+           ssh -o StrictHostKeyChecking=no localhost true
+
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
