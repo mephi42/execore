@@ -372,9 +372,9 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
     fprintf(stderr, "PTRACE_DETACH failed: errno=%d\n", (int)-pt_err);
     goto err_kill;
   }
-  char pid_str[32];
-  itoa_r((long)pid, pid_str);
-  gdb_argv[2] = pid_str;
+  char pid_str[32] = "--pid=";
+  itoa_r((long)pid, pid_str + strlen(pid_str));
+  gdb_argv[1] = pid_str;
   if (EXECORE_(execvpe)(gdb_argv[0], gdb_argv, environ) == -1) {
     fprintf(stderr, "execvpe() failed: errno=%d\n", errno);
     goto err_kill;
@@ -413,15 +413,13 @@ static void __attribute__((noreturn)) execore(void *arg) {
     goto err;
   }
 
-  int gdb_argc = 5 + (aa->argc - argn);
+  int gdb_argc = 3 + (aa->argc - argn);
   char **gdb_argv = alloca((gdb_argc + 1) * sizeof(char *));
   int gdb_argn = 0;
   gdb_argv[gdb_argn++] = "gdb";
-  gdb_argv[gdb_argn++] = "-p";
   gdb_argn++; /* real pid, filled by execore_1() */
   /* https://github.com/mephi42/gdb-pounce/blob/v0.0.16/gdb-pounce#L411 */
-  gdb_argv[gdb_argn++] = "-ex";
-  gdb_argv[gdb_argn++] = "handle SIGSTOP nostop noprint nopass";
+  gdb_argv[gdb_argn++] = "--eval-command=handle SIGSTOP nostop noprint nopass";
   for (int i = argn; i < aa->argc; i++)
     gdb_argv[gdb_argn++] = strdupa(aa->argv[i]);
   if (gdb_argn != gdb_argc) {
