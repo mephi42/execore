@@ -17,6 +17,7 @@ cd "$workdir"
 # Test record + replay.
 gdb "$phoenix" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="starti" \
     --eval-command="execore-record 1000" \
@@ -32,6 +33,7 @@ cat execore.diff
 # Test record-replay.
 gdb "$phoenix" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="starti" \
     --eval-command="execore-record-replay 1000" \
@@ -42,6 +44,7 @@ grep "Traces match" log
 # Test record + replay of a crash.
 gdb "$phoenix" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="handle SIGABRT nostop" \
     --eval-command="break main" \
@@ -55,6 +58,7 @@ cat execore.diff
 # Test record-replay of a crash.
 gdb "$phoenix" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="handle SIGABRT nostop" \
     --eval-command="break main" \
@@ -67,9 +71,32 @@ grep "Traces match" log
 # Test remote record-replay.
 gdb "$phoenix" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="starti" \
     --eval-command="execore-record-replay --remote=localhost --execore=$execore 1000" \
+    --eval-command=quit 2>&1 | tee log
+grep "Saved corefile" log
+grep "Traces match" log
+
+# Test record-replay with memory.
+gdb "$phoenix" \
+    --batch \
+    --eval-command="set python print-stack full" \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="starti" \
+    --eval-command="execore-record-replay --memory 1000" \
+    --eval-command=quit 2>&1 | tee log
+grep "Saved corefile" log
+grep "Traces match" log
+
+# Test remote record-replay with memory.
+gdb "$phoenix" \
+    --batch \
+    --eval-command="set python print-stack full" \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="starti" \
+    --eval-command="execore-record-replay --execore=$execore --memory --remote=localhost 1000" \
     --eval-command=quit 2>&1 | tee log
 grep "Saved corefile" log
 grep "Traces match" log

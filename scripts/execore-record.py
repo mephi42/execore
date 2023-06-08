@@ -10,6 +10,7 @@ import contextlib
 import inspect
 import os
 import shlex
+import shutil
 import subprocess
 import tarfile
 import uuid
@@ -147,6 +148,55 @@ def iter_objfile_names():
         yield os.path.realpath(objfile_name)
 
 
+def iter_mappings():
+    try:
+        execore_start = int(gdb.parse_and_eval("&_execore_start"))
+        execore_end = int(gdb.parse_and_eval("&_execore_end"))
+    except gdb.error:
+        execore_start = None
+        execore_end = None
+    skip = True
+    for line in gdb.execute("info proc mappings", to_string=True).split("\n"):
+        if "Start Addr" in line:
+            skip = False
+            continue
+        if skip:
+            continue
+        if line == "":
+            break
+        start, end, *_ = line.split()
+        start = int(start, 0)
+        end = int(end, 0)
+        if (
+            execore_start is None
+            or execore_start >= end
+            or execore_end is None
+            or execore_end <= start
+        ):
+            yield start, end
+
+
+def dump_memory(path):
+    with open(path, "w") as fp:
+        first_line = True
+        for start, end in iter_mappings():
+            for page in range(start, end, 0x1000):
+                try:
+                    data = gdb.selected_inferior().read_memory(page, 0x1000)
+                except gdb.MemoryError:
+                    continue
+                for i in range(0x1000):
+                    if i % 0x10 == 0:
+                        if first_line:
+                            first_line = False
+                        else:
+                            fp.write("\n")
+                        fp.write("{:016x}:".format(page + i))
+                    if i % 0x8 == 0:
+                        fp.write(" ")
+                    fp.write(" {:02x}".format(data[i][0]))
+
+
 class ExecoreRecord(gdb.Command):
     def __init__(self):
         super(ExecoreRecord, self).__init__("execore-record", gdb.COMMAND_USER)
@@ -187,9 +237,14 @@ class ExecoreReplay(gdb.Command):
         super(ExecoreReplay, self).__init__("execore-replay", gdb.COMMAND_USER)
 
     def invoke(self, arg, from_tty):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("max_insns", type=int)
-        parser.add_argument("epoch", type=int)
+        parser = argparse.ArgumentParser(description="Replay instruction trace")
+        parser.add_argument(
+            "--memory", action="store_true", help="Generate a memory dump at the end"
+        )
+        parser.add_argument(
+            "max_insns", type=int, help="The number of instructions to replay"
+        )
+        parser.add_argument("epoch", type=int, help="Epoch number")
         args = parser.parse_args(shlex.split(arg))
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         gdb.execute("set pagination off")
@@ -199,6 +254,8 @@ class ExecoreReplay(gdb.Command):
                 dump_regs(fp, arch, epoch_insns)
                 gdb.execute("si")
                 epoch_insns += 1
+        if args.memory:
+            dump_memory("memory.{}.r".format(args.epoch))
         gdb.execute("kill")
         gdb.execute("quit")
 
@@ -242,13 +299,27 @@ class ExecoreRecordReplay(gdb.Command):
         )
 
     def invoke(self, arg, from_tty):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--remote")
-        parser.add_argument("--execore", default="execore")
-        parser.add_argument("max_insns", type=int)
+        parser = argparse.ArgumentParser(
+            description="Record, replay and compare instruction traces"
+        )
+        parser.add_argument(
+            "--execore",
+            default="execore",
+            help="Replay using the specified execore binary",
+        )
+        parser.add_argument(
+            "--memory",
+            action="store_true",
+            help="Compare memory at the end of each epoch",
+        )
+        parser.add_argument("--remote", help="Replay on the specified remote machine")
+        parser.add_argument(
+            "max_insns",
+            type=int,
+            help="The number of instructions to record and replay",
+        )
         args = parser.parse_args(shlex.split(arg))
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
-
         with temporary_remote_directory(args.remote) as remote_dir:
             total_insns = 0
             epoch = 0
@@ -262,8 +333,14 @@ class ExecoreRecordReplay(gdb.Command):
                 total_insns, epoch_insns, proceed = record_epoch(
                     trace_path, arch, total_insns, args.max_insns
                 )
-
-                replay_path = "trace.{}.r".format(epoch)
+                memory_path = "memory.{}".format(epoch)
+                if args.memory:
+                    dump_memory(memory_path)
+                trace_replay_path = "trace.{}.r".format(epoch)
+                memory_replay_path = "memory.{}.r".format(epoch)
+                outputs = [core_path, trace_path, trace_replay_path]
+                if args.memory:
+                    outputs.extend((memory_path, memory_replay_path))
                 if remote_dir is None:
                     check_call(
                         [
@@ -271,8 +348,8 @@ class ExecoreRecordReplay(gdb.Command):
                             core_path,
                             "--batch",
                             "--eval-command=source {}".format(this_file()),
-                            "--eval-command=execore-replay {} {}".format(
-                                epoch_insns, epoch
+                            "--eval-command=execore-replay {}{} {}".format(
+                                "--memory " if args.memory else "", epoch_insns, epoch
                             ),
                         ],
                     )
@@ -297,30 +374,47 @@ class ExecoreRecordReplay(gdb.Command):
                                         "--eval-command=source {}".format(
                                             os.path.basename(this_file())
                                         ),
-                                        "--eval-command=execore-replay {} 0".format(
-                                            epoch_insns
+                                        "--eval-command=execore-replay {}{} 0".format(
+                                            "--memory " if args.memory else "",
+                                            epoch_insns,
                                         ),
                                     ]
                                 ),
                             )
                         ),
                     )
-                    remote_replay_path = "{}/trace.0.r".format(remote_dir)
-                    rsync("{}:{}".format(args.remote, remote_replay_path), replay_path)
-                    ssh(args.remote, "rm", remote_replay_path)
-
-                try:
-                    check_call(["colordiff", "--unified=50", replay_path, trace_path])
-                except subprocess.CalledProcessError:
-                    print(
-                        "\nTraces do not match, check {}, {} and {}\n".format(
-                            core_path, trace_path, replay_path
-                        )
+                    remote_trace_replay_path = "{}/trace.0.r".format(remote_dir)
+                    rsync(
+                        "{}:{}".format(args.remote, remote_trace_replay_path),
+                        trace_replay_path,
                     )
+                    ssh(args.remote, "rm", remote_trace_replay_path)
+                    if args.memory:
+                        remote_memory_replay_path = "{}/memory.0.r".format(remote_dir)
+                        shutil.copy(memory_path, memory_replay_path)
+                        rsync(
+                            "{}:{}".format(args.remote, remote_memory_replay_path),
+                            memory_replay_path,
+                        )
+                        ssh(args.remote, "rm", remote_memory_replay_path)
+                try:
+                    check_call(
+                        ["colordiff", "--unified=50", trace_replay_path, trace_path]
+                    )
+                    if args.memory:
+                        check_call(
+                            [
+                                "colordiff",
+                                "--unified=50",
+                                memory_replay_path,
+                                memory_path,
+                            ]
+                        )
+                except subprocess.CalledProcessError:
+                    print("\nTraces do not match, see: {}\n".format(", ".join(outputs)))
                     return
-                os.unlink(core_path)
-                os.unlink(trace_path)
-                os.unlink(replay_path)
+                for output in outputs:
+                    os.unlink(output)
                 epoch += 1
                 if not proceed:
                     break
