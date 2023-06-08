@@ -127,6 +127,12 @@ add_test(
 )
 
 add_test(
+        NAME shfmt
+        COMMAND shfmt -d -i 4 ${SHELL_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(
         NAME record-replay
         COMMAND test/record-replay.test $<TARGET_FILE:execore> $<TARGET_FILE:phoenix>
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -138,7 +144,8 @@ add_test(
 
 add_custom_target(fmt
         COMMAND clang-format -i ${SOURCES} ${TEST_SOURCES} &&
-                black ${PYTHON_SOURCES}
+                black ${PYTHON_SOURCES} &&
+                shfmt -w -i 4 ${SHELL_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 

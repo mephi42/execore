@@ -17,7 +17,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install packages
-      run: sudo apt-get install -y black colordiff flake8 gdb shellcheck
+      run: sudo apt-get install -y black colordiff flake8 gdb shellcheck shfmt
 
     - name: Allow ssh localhost
       run: mkdir -m 700 -p ~/.ssh &&
