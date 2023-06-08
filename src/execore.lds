@@ -14,6 +14,7 @@ SECTIONS {
         .rodata : { *(.rodata*) } :rodata
         . = ALIGN(0x1000);
         .bss : { *(.bss) } :bss
+        . = ALIGN(0x1000);
         _execore_end = .;
         /DISCARD/ : { *(.note.*) }
 }

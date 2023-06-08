@@ -13,11 +13,13 @@ cd "$workdir"
 ulimit -c unlimited
 gdb "$phoenix" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command=run \
     --eval-command=generate-core-file \
     --eval-command=quit
 "$execore" "$(echo core.*)" \
     --batch \
+    --eval-command="set python print-stack full" \
     --eval-command="x/i \$pc" \
     --eval-command=continue \
     --eval-command=quit | tee log
