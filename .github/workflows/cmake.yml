@@ -28,7 +28,7 @@ jobs:
     - name: Build (Debug)
       run: cmake --build ${{github.workspace}}/cmake-build-debug --config Debug
 
-    # - name: Setup upterm session
+    # - name: Setup upterm session (Debug)
     #   uses: lhotari/action-upterm@v1
 
     - name: Test (Debug)
@@ -41,8 +41,8 @@ jobs:
     - name: Build (Release)
       run: cmake --build ${{github.workspace}}/cmake-build-release --config Release
 
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@v1
+    # - name: Setup upterm session (Release)
+    #   uses: lhotari/action-upterm@v1
 
     - name: Test (Release)
       working-directory: ${{github.workspace}}/cmake-build-release
