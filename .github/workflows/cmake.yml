@@ -6,9 +6,6 @@ on:
 
 name: Continuous integration
 
-env:
-  BUILD_TYPE: RelWithDebInfo
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,15 +22,28 @@ jobs:
            cat ~/.ssh/id_ecdsa.pub >>~/.ssh/authorized_keys &&
            ssh -o StrictHostKeyChecking=no localhost true
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+    - name: Configure CMake (Debug)
+      run: cmake -B ${{github.workspace}}/cmake-build-debug -DCMAKE_BUILD_TYPE=Debug
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+    - name: Build (Debug)
+      run: cmake --build ${{github.workspace}}/cmake-build-debug --config Debug
 
     # - name: Setup upterm session
     #   uses: lhotari/action-upterm@v1
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
+    - name: Test (Debug)
+      working-directory: ${{github.workspace}}/cmake-build-debug
+      run: ctest -C Debug --output-on-failure
+
+    - name: Configure CMake (Release)
+      run: cmake -B ${{github.workspace}}/cmake-build-release -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build (Release)
+      run: cmake --build ${{github.workspace}}/cmake-build-release --config Release
+
+      # - name: Setup upterm session
+      #   uses: lhotari/action-upterm@v1
+
+    - name: Test (Release)
+      working-directory: ${{github.workspace}}/cmake-build-release
+      run: ctest -C Release --output-on-failure
