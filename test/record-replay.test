@@ -16,11 +16,11 @@ cd "$workdir"
 
 # Test record + replay.
 gdb "$phoenix" \
-  --batch \
-  --eval-command="source $source_dir/scripts/execore-record.py" \
-  --eval-command="starti" \
-  --eval-command="execore-record 1000" \
-  --eval-command=quit
+    --batch \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="starti" \
+    --eval-command="execore-record 1000" \
+    --eval-command=quit
 mkdir extracted
 tar -C extracted -xf execore.tar.gz
 [ "$(find extracted -name "trace.*" -print0 | xargs -0 cat | grep -c ^\\[)" = 1000 ]
@@ -31,45 +31,45 @@ cat execore.diff
 
 # Test record-replay.
 gdb "$phoenix" \
-  --batch \
-  --eval-command="source $source_dir/scripts/execore-record.py" \
-  --eval-command="starti" \
-  --eval-command="execore-record-replay 1000" \
-  --eval-command=quit 2>&1 | tee log
+    --batch \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="starti" \
+    --eval-command="execore-record-replay 1000" \
+    --eval-command=quit 2>&1 | tee log
 grep "Saved corefile" log
 grep "Traces match" log
 
 # Test record + replay of a crash.
 gdb "$phoenix" \
-  --batch \
-  --eval-command="source $source_dir/scripts/execore-record.py" \
-  --eval-command="handle SIGABRT nostop" \
-  --eval-command="break main" \
-  --eval-command="run" \
-  --eval-command="execore-record 1000" \
-  --eval-command=quit
+    --batch \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="handle SIGABRT nostop" \
+    --eval-command="break main" \
+    --eval-command="run" \
+    --eval-command="execore-record 1000" \
+    --eval-command=quit
 "$source_dir"/scripts/execore-replay execore.tar.gz
 cat execore.diff
 [ ! -s execore.diff ]
 
 # Test record-replay of a crash.
 gdb "$phoenix" \
-  --batch \
-  --eval-command="source $source_dir/scripts/execore-record.py" \
-  --eval-command="handle SIGABRT nostop" \
-  --eval-command="break main" \
-  --eval-command="run" \
-  --eval-command="execore-record-replay 1000" \
-  --eval-command=quit 2>&1 | tee log
+    --batch \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="handle SIGABRT nostop" \
+    --eval-command="break main" \
+    --eval-command="run" \
+    --eval-command="execore-record-replay 1000" \
+    --eval-command=quit 2>&1 | tee log
 grep "Saved corefile" log
 grep "Traces match" log
 
 # Test remote record-replay.
 gdb "$phoenix" \
-  --batch \
-  --eval-command="source $source_dir/scripts/execore-record.py" \
-  --eval-command="starti" \
-  --eval-command="execore-record-replay --remote=localhost --execore=$execore 1000" \
-  --eval-command=quit 2>&1 | tee log
+    --batch \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="starti" \
+    --eval-command="execore-record-replay --remote=localhost --execore=$execore 1000" \
+    --eval-command=quit 2>&1 | tee log
 grep "Saved corefile" log
 grep "Traces match" log
