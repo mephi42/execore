@@ -289,6 +289,18 @@ def temporary_remote_directory(remote):
         rsync(this_file(), "{}:{}/".format(remote, remote_dir))
         yield remote_dir
     finally:
+        ssh(
+            remote,
+            "find",
+            remote_dir,
+            "-type",
+            "d",
+            "-exec",
+            "chmod",
+            "u+w",
+            "{}",
+            "\\;",
+        )
         ssh(remote, "rm", "-r", remote_dir)
 
 
