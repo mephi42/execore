@@ -251,7 +251,12 @@ class ExecoreReplay(gdb.Command):
         with open("trace.{}.r".format(args.epoch), "w") as fp:
             epoch_insns = 0
             while epoch_insns < args.max_insns:
-                dump_regs(fp, arch, epoch_insns)
+                if not dump_regs(fp, arch, epoch_insns):
+                    if args.memory:
+                        with open("memory.{}.r".format(args.epoch), "w"):
+                            pass
+                    gdb.execute("quit")
+                    return
                 gdb.execute("si")
                 epoch_insns += 1
         if args.memory:
