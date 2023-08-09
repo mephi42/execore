@@ -14,7 +14,8 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Install packages
-      run: sudo apt-get install -y black colordiff flake8 gdb shellcheck shfmt
+      run: sudo apt-get update &&
+           sudo apt-get install -y black colordiff flake8 gdb gcc-s390x-linux-gnu shellcheck shfmt
 
     - name: Allow ssh localhost
       run: mkdir -m 700 -p ~/.ssh &&
@@ -47,3 +48,15 @@ jobs:
     - name: Test (Release)
       working-directory: ${{github.workspace}}/cmake-build-release
       run: ctest -C Release --output-on-failure
+
+    - name: Configure CMake (s390x Debug)
+      run: cmake -B ${{github.workspace}}/cmake-build-s390x-debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=s390x-linux-gnu-gcc
+
+    - name: Build (s390x Debug)
+      run: cmake --build ${{github.workspace}}/cmake-build-s390x-debug --config Debug
+
+    - name: Configure CMake (s390x Release)
+      run: cmake -B ${{github.workspace}}/cmake-build-s390x-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=s390x-linux-gnu-gcc
+
+    - name: Build (s390x Release)
+      run: cmake --build ${{github.workspace}}/cmake-build-s390x-release --config Release
