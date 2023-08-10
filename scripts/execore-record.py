@@ -106,9 +106,56 @@ class X86_64:
         return reg_val
 
 
+class PPC64:
+    REGS = [
+        "$r0",
+        "$r1",
+        "$r2",
+        "$r3",
+        "$r4",
+        "$r5",
+        "$r6",
+        "$r7",
+        "$r8",
+        "$r9",
+        "$r10",
+        "$r11",
+        "$r12",
+        "$r13",
+        "$r14",
+        "$r15",
+        "$r16",
+        "$r17",
+        "$r18",
+        "$r19",
+        "$r20",
+        "$r21",
+        "$r22",
+        "$r23",
+        "$r24",
+        "$r25",
+        "$r26",
+        "$r27",
+        "$r28",
+        "$r29",
+        "$r30",
+        "$r31",
+        "$pc",
+        "$cr",
+        "$lr",
+        "$ctr",
+    ]
+    STOP_INSNS = ["mftb", "mftbu", "mfspr", "sc"]
+
+    @classmethod
+    def fixup_reg(cls, reg, reg_val):
+        return reg_val
+
+
 ARCHES = {
     "s390:64-bit": S390X,
     "i386:x86-64": X86_64,
+    "powerpc:common64": PPC64,
 }
 
 

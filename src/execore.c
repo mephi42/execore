@@ -87,6 +87,35 @@ static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
   return 0;
 }
 
+#elif defined(__powerpc64__)
+
+#define ARCH_EM EM_PPC64
+
+static __attribute__((noreturn)) void
+arch_switch_stack(void __attribute__((noreturn)) (*f)(void *), void *arg,
+                  void *stack) {
+  stack = (void *)((long)stack & -0x10L);
+  asm("mr 1,%[stack]\n"
+      "mr 3,%[arg]\n"
+      "mtctr %[f]\n"
+      "bctrl\n"
+      :
+      : [f] "r"(f), [arg] "r"(arg), [stack] "r"(stack)
+      : "3", "ctr");
+  __builtin_unreachable();
+}
+
+static int arch_is_mappable_addr(void *p) {
+  (void)p;
+  return 1;
+}
+
+static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
+  (void)pid;
+  (void)reg;
+  return 0;
+}
+
 #else
 #error Unsupported architecture
 #endif

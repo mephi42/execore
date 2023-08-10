@@ -3,6 +3,10 @@
 
 #include <elf.h>
 
+#ifndef NT_FILE
+#define NT_FILE 0x46494c45
+#endif
+
 struct note {
   unsigned int type;
   const char *name;

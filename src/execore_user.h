@@ -65,6 +65,8 @@ typedef struct {
   fpreg_t __ctx(fprs)[16];
 } fpregset_t;
 
+#elif defined(__powerpc64__)
+
 #else
 #error Unsupported architecture
 #endif
