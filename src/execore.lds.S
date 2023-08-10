@@ -1,3 +1,5 @@
+#include "execore_page.h"
+
 ENTRY(_start);
 
 PHDRS {
@@ -10,11 +12,11 @@ SECTIONS {
         . = 0x70000000;
         _execore_start = .;
         .text : { *(.text*) } :text
-        . = ALIGN(0x1000);
+        . = ALIGN(PAGE_SIZE);
         .rodata : { *(.rodata*) } :rodata
-        . = ALIGN(0x1000);
+        . = ALIGN(PAGE_SIZE);
         .bss : { *(.bss) } :bss
-        . = ALIGN(0x1000);
+        . = ALIGN(PAGE_SIZE);
         _execore_end = .;
         /DISCARD/ : { *(.note.*) }
 }
