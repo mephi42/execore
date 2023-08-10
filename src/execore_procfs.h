@@ -21,6 +21,16 @@ typedef gregset_t elf_gregset_t;
 typedef fpreg_t elf_fpreg_t;
 typedef fpregset_t elf_fpregset_t;
 
+#elif defined(__powerpc64__)
+
+#define ELF_NGREG 48
+#define ELF_NFPREG 33
+typedef unsigned long elf_greg_t64;
+typedef elf_greg_t64 elf_gregset_t64[ELF_NGREG];
+typedef elf_gregset_t64 elf_gregset_t;
+typedef double elf_fpreg_t;
+typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
+
 #else
 #error Unsupported architecture
 #endif
