@@ -19,7 +19,12 @@ gdb "$phoenix" \
     --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="starti" \
-    --eval-command="execore-record-replay 1000" \
-    --eval-command=quit 2>&1 | tee log
-grep "Saved corefile" log
-grep "Traces match" log
+    --eval-command="execore-record 1000" \
+    --eval-command=quit
+mkdir extracted
+tar -C extracted -xf execore.tar.gz
+[ "$(find extracted -name "trace.*" -print0 | xargs -0 cat | grep -c ^\\[)" = 1000 ]
+rm -r extracted
+"$source_dir"/scripts/execore-replay execore.tar.gz
+cat execore.diff
+[ ! -s execore.diff ]

@@ -19,7 +19,7 @@ gdb "$phoenix" \
     --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="starti" \
-    --eval-command="execore-record-replay 1000" \
+    --eval-command="execore-record-replay --memory 1000" \
     --eval-command=quit 2>&1 | tee log
 grep "Saved corefile" log
 grep "Traces match" log

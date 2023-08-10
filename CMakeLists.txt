@@ -113,11 +113,22 @@ add_test(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
+set(RECORD_REPLAY_TESTS
+        test/record+replay.test
+        test/record+replay-crash.test
+        test/record-replay.test
+        test/record-replay-crash.test
+        test/record-replay-memory.test
+        test/record-replay-remote.test
+        test/record-replay-remote-memory.test
+)
+
 set(SHELL_SOURCES
         scripts/execore-replay
         test/phoenix.test
         test/record-replay.test
         test/test_execvpe.sh
+        ${RECORD_REPLAY_TESTS}
 )
 
 add_test(
@@ -132,11 +143,14 @@ add_test(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-add_test(
-        NAME record-replay
-        COMMAND test/record-replay.test $<TARGET_FILE:execore> $<TARGET_FILE:phoenix>
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
+foreach(test ${RECORD_REPLAY_TESTS})
+  get_filename_component(test_name ${test} NAME)
+  add_test(
+          NAME ${test_name}
+          COMMAND ${test} $<TARGET_FILE:execore> $<TARGET_FILE:phoenix>
+          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
+endforeach()
 
 #
 # Maintenance.
