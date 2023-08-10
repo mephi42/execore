@@ -61,7 +61,7 @@ class S390X:
         "$f14",
         "$f15",
     ]
-    STOP_INSNS = ["stck\t", "stckf\t", "stfle\t", "svc\t"]
+    STOP_INSNS = ["stck", "stckf", "stfle", "svc"]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
@@ -97,7 +97,7 @@ class X86_64:
         "$fs",
         "$gs",
     ]
-    STOP_INSNS = ["syscall ", "rdtsc ", "cpuid "]
+    STOP_INSNS = ["syscall", "rdtsc", "cpuid"]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
@@ -136,7 +136,7 @@ def record_epoch(trace_path, arch, total_insns, max_insns):
             gdb.execute("si")
             epoch_insns += 1
             total_insns += 1
-            if any(stop_insn in insn for stop_insn in arch.STOP_INSNS):
+            if any(stop_insn in insn.split() for stop_insn in arch.STOP_INSNS):
                 break
     return total_insns, epoch_insns, proceed
 
