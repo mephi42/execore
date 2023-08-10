@@ -41,7 +41,14 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
   target_compile_options(execore PRIVATE -Wno-unknown-attributes)
 endif()
 target_include_directories(execore PRIVATE src src/fakelibc src/nolibc)
-set(LDS ${CMAKE_SOURCE_DIR}/src/execore.lds)
+set(LDS_S ${CMAKE_SOURCE_DIR}/src/execore.lds.S)
+set(LDS ${CMAKE_BINARY_DIR}/execore.lds)
+add_custom_command(OUTPUT ${LDS}
+	MAIN_DEPENDENCY ${LDS_S}
+        COMMAND ${CMAKE_C_COMPILER} -E ${LDS_S} -P -o ${LDS}
+)
+add_custom_target(preprocess_lds DEPENDS ${LDS})
+
 target_link_options(execore PRIVATE
         -nostdlib
         -static
@@ -49,6 +56,7 @@ target_link_options(execore PRIVATE
         -Wl,--script=${LDS}
 )
 set_target_properties(execore PROPERTIES LINK_DEPENDS ${LDS})
+add_dependencies(execore preprocess_lds)
 target_link_libraries(execore gcc)
 
 #

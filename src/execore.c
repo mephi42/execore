@@ -4,6 +4,7 @@
 #include "execore_elf.h"
 #include "execore_maps.h"
 #include "execore_mman.h"
+#include "execore_page.h"
 #include "execore_procfs.h"
 #include "execore_ptrace.h"
 #include "execore_stdlib.h"
@@ -251,12 +252,14 @@ err:
   return -1;
 }
 
-#define PHDR_PAGE_ADDR(phdr) ((void *)((phdr)->p_vaddr & -0x1000UL))
+#define PHDR_PAGE_ADDR(phdr)                                                   \
+  ((void *)((phdr)->p_vaddr & (unsigned long)(-PAGE_SIZE)))
 #define PHDR_PAGE_SIZE(phdr)                                                   \
   ({                                                                           \
     Elf64_Phdr *__phdr = (phdr);                                               \
-    ((__phdr->p_vaddr + __phdr->p_memsz + 0xFFFUL) & -0x1000UL) -              \
-        (__phdr->p_vaddr & -0x1000UL);                                         \
+    ((__phdr->p_vaddr + __phdr->p_memsz + (unsigned long)(PAGE_SIZE - 1)) &    \
+     (unsigned long)(-PAGE_SIZE)) -                                            \
+        (__phdr->p_vaddr & (unsigned long)(-PAGE_SIZE));                       \
   })
 
 static int map_phdr(Elf64_Phdr *phdr, void *arg) {
