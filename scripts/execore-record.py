@@ -7,6 +7,7 @@ Saved execore.tar.gz
 """
 import argparse
 import contextlib
+import hashlib
 import inspect
 import os
 import shlex
@@ -371,6 +372,13 @@ class ExecoreRecordReplay(gdb.Command):
                         ],
                     )
                 else:
+                    core_hash = hashlib.sha256()
+                    with open(core_path, "rb") as fp:
+                        while True:
+                            buf = fp.read(0x2000)
+                            if len(buf) == 0:
+                                break
+                            core_hash.update(buf)
                     rsync(core_path, "{}:{}/core.0".format(args.remote, remote_dir))
                     rsync(
                         "-R",
@@ -382,6 +390,9 @@ class ExecoreRecordReplay(gdb.Command):
                         " && ".join(
                             (
                                 shlex.join(["cd", remote_dir]),
+                                "(echo "
+                                + core_hash.hexdigest()
+                                + " core.0 | sha256sum --check)",
                                 shlex.join(
                                     [
                                         args.execore,
