@@ -13,7 +13,8 @@ const unsigned long *_auxv __attribute__((weak));
 static void __stack_chk_init(void);
 static void exit(int);
 
-__attribute__((weak)) void _start_c(long *sp)
+__attribute__((weak))
+void _start_c(long *sp)
 {
 	long argc;
 	char **argv;
