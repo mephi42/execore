@@ -358,32 +358,90 @@ static void protect_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
 
 #define AT_VECTOR_SIZE 128
 
-static int set_auxv_from_note(struct note *n, void *arg) {
-  struct path_fd *pf = arg;
+struct auxv {
+  unsigned long data[AT_VECTOR_SIZE];
+  unsigned int size; /* in bytes */
+};
+
+struct get_auxv_context {
+  const char *path;
+  int fd;
+  int found;
+  struct auxv *auxv;
+};
+
+static int get_auxv_from_note(struct note *n, void *arg) {
+  struct get_auxv_context *ctx = arg;
   if (n->type == NT_AUXV) {
-    unsigned long auxv[AT_VECTOR_SIZE];
-    if (n->desc_sz > sizeof(auxv)) {
-      fprintf(stderr,
-              "Warning: not setting auxv, because the NT_AUXV note in %s is "
-              "too large\n",
-              pf->path);
-      goto out;
+    if (n->desc_sz > sizeof(ctx->auxv->data)) {
+      fprintf(stderr, "Warning: NT_AUXV note in %s is too large\n", ctx->path);
+      goto err;
     }
-    PREAD_EXACT(pf->path, pf->fd, auxv, n->desc_sz, n->desc_off, out);
-
-    if (prctl(PR_SET_MM, PR_SET_MM_AUXV, (unsigned long)auxv, n->desc_sz, 0) <
-        0)
-      fprintf(stderr, "Warning: PR_SET_MM_AUXV failed: errno=%d\n", errno);
+    PREAD_EXACT(ctx->path, ctx->fd, ctx->auxv->data, n->desc_sz, n->desc_off,
+                err);
+    ctx->auxv->size = n->desc_sz;
+    ctx->found = 1;
   }
+  return 0;
 
-out:
+err:
+  return -1;
+}
+
+static int get_auxv(const char *path, int fd, Elf64_Ehdr *ehdr,
+                    struct auxv *auxv) {
+  struct get_auxv_context ctx = {
+      .path = path, .fd = fd, .found = 0, .auxv = auxv};
+  if (for_each_note(path, fd, ehdr, get_auxv_from_note, &ctx) == -1)
+    return -1;
+  if (!ctx.found) {
+    fprintf(stderr, "Warning: no NT_AUXV note in %s\n", path);
+    return -1;
+  }
   return 0;
 }
 
-static void set_auxv(const char *path, int fd, Elf64_Ehdr *ehdr) {
-  struct path_fd pf = {.path = path, .fd = fd};
-  if (for_each_note(path, fd, ehdr, set_auxv_from_note, &pf) == -1)
-    exit(EXIT_FAILURE);
+static unsigned long get_execfn_addr(const struct auxv *auxv) {
+  for (unsigned int i = 0; i < auxv->size / sizeof(unsigned long); i += 2)
+    if (auxv->data[i] == AT_EXECFN)
+      return auxv->data[i + 1];
+  return -1;
+}
+
+static void get_proc_mem_path(char *buf, pid_t pid) {
+  strcpy(buf, "/proc/");
+  buf += strlen(buf);
+  utoa_r(pid, buf);
+  strcpy(buf + strlen(buf), "/mem");
+}
+
+static int ptrace_read_str(pid_t pid, unsigned long addr, char *buf, size_t n) {
+  char proc_mem_path[64];
+  get_proc_mem_path(proc_mem_path, pid);
+  int fd = open(proc_mem_path, O_RDONLY);
+  if (fd < 0) {
+    fprintf(stderr, "open(%s) failed: errno=%d\n", proc_mem_path, errno);
+    goto err;
+  }
+  size_t i;
+  for (i = 0; i < n; i++) {
+    PREAD_EXACT(proc_mem_path, fd, buf + i, 1, addr + i, err_close);
+    if (buf[i] == 0)
+      break;
+  }
+  close(fd);
+  return i == n ? -1 : 0;
+
+err_close:
+  close(fd);
+err:
+  return -1;
+}
+
+static void set_auxv(struct auxv *auxv) {
+  if (prctl(PR_SET_MM, PR_SET_MM_AUXV, (unsigned long)auxv->data, auxv->size,
+            0) < 0)
+    fprintf(stderr, "Warning: PR_SET_MM_AUXV failed: errno=%d\n", errno);
 }
 
 static void execore_1(const char *core_path, int fd, const char *sysroot,
@@ -408,6 +466,9 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
     goto err;
   }
 
+  struct auxv auxv;
+  int have_auxv = get_auxv(core_path, fd, &ehdr, &auxv) == 0;
+
   pid_t pid = fork();
   if (pid == -1) {
     fprintf(stderr, "fork() failed: errno=%d\n", errno);
@@ -420,7 +481,8 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
     map_nt_files(core_path, fd, sysroot, &ehdr);
     read_phdrs(core_path, fd, &ehdr);
     protect_phdrs(core_path, fd, &ehdr);
-    set_auxv(core_path, fd, &ehdr);
+    if (have_auxv)
+      set_auxv(&auxv);
     close(fd);
     sys_ptrace(PTRACE_TRACEME, 0, 0, 0);
     raise(SIGSTOP);
@@ -437,6 +499,20 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
     goto err_kill;
   }
 
+  char execfn[PATH_MAX];
+  if (have_auxv) {
+    unsigned long execfn_addr = get_execfn_addr(&auxv);
+    if (execfn_addr == (unsigned long)-1) {
+      fprintf(stderr, "Warning: no AT_EXECFN auxval in %s\n", core_path);
+    } else {
+      if (ptrace_read_str(pid, execfn_addr, execfn, sizeof(execfn))) {
+        fprintf(stderr, "Warning: could not read AT_EXECFN\n");
+      } else {
+        gdb_argv[1] = execfn;
+      }
+    }
+  }
+
   struct setregset_context ctx = {
       .pid = pid, .path = core_path, .fd = fd, .tid = tid, .current_tid = -1};
   if (for_each_note(core_path, fd, &ehdr, setregset, &ctx) == -1)
@@ -449,7 +525,7 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
   }
   char pid_str[32] = "--pid=";
   itoa_r((long)pid, pid_str + strlen(pid_str));
-  gdb_argv[1] = pid_str;
+  gdb_argv[2] = pid_str;
   if (EXECORE_(execvpe)(gdb_argv[0], gdb_argv, environ) == -1) {
     fprintf(stderr, "execvpe() failed: errno=%d\n", errno);
     goto err_kill;
@@ -468,6 +544,7 @@ struct argc_argv {
 
 static void __attribute__((noreturn)) execore(void *arg) {
   struct argc_argv *aa = arg;
+  char add_symbol_file[strlen(aa->argv[0]) + 128];
   char *core_path = NULL;
   char *sysroot = NULL;
   int argn = 1;
@@ -487,18 +564,29 @@ static void __attribute__((noreturn)) execore(void *arg) {
     }
   }
   if (core_path == NULL) {
-    fprintf(stderr, "Usage: %s [--sysroot=PATH] CORE [GDB_ARG [GDB_ARG ...]]\n",
-            aa->argv[0]);
+    fprintf(
+        stderr,
+        "Usage: %s [--sysroot=PATH] [--tid=TID] CORE [GDB_ARG [GDB_ARG ...]]\n",
+        aa->argv[0]);
     goto err;
   }
 
-  int gdb_argc = 3 + (aa->argc - argn);
+  int gdb_argc = 5 + (aa->argc - argn);
   char **gdb_argv = alloca((gdb_argc + 1) * sizeof(char *));
   int gdb_argn = 0;
   gdb_argv[gdb_argn++] = "gdb";
-  gdb_argn++; /* real pid, filled by execore_1() */
+  gdb_argv[gdb_argn++] =
+      strdupa(aa->argv[0]); /* execfn, filled by execore_1() */
+  gdb_argn++;               /* real pid, filled by execore_1() */
   /* https://github.com/mephi42/gdb-pounce/blob/v0.0.16/gdb-pounce#L411 */
   gdb_argv[gdb_argn++] = "--eval-command=handle SIGSTOP nostop noprint nopass";
+  strcpy(add_symbol_file, "--eval-command=add-symbol-file ");
+  char *p = add_symbol_file + strlen(add_symbol_file);
+  strcpy(p, aa->argv[0]);
+  p += strlen(p);
+  strcpy(p, " 0x");
+  utoh_r((unsigned long)_execore_start, p + strlen(p));
+  gdb_argv[gdb_argn++] = add_symbol_file;
   for (int i = argn; i < aa->argc; i++)
     gdb_argv[gdb_argn++] = strdupa(aa->argv[i]);
   if (gdb_argn != gdb_argc) {
