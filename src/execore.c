@@ -345,6 +345,36 @@ static void protect_phdrs(const char *path, int fd, Elf64_Ehdr *ehdr) {
     exit(EXIT_FAILURE);
 }
 
+#define AT_VECTOR_SIZE 128
+
+static int set_auxv_from_note(struct note *n, void *arg) {
+  struct path_fd *pf = arg;
+  if (n->type == NT_AUXV) {
+    unsigned long auxv[AT_VECTOR_SIZE];
+    if (n->desc_sz > sizeof(auxv)) {
+      fprintf(stderr,
+              "Warning: not setting auxv, because the NT_AUXV note in %s is "
+              "too large\n",
+              pf->path);
+      goto out;
+    }
+    PREAD_EXACT(pf->path, pf->fd, auxv, n->desc_sz, n->desc_off, out);
+
+    if (prctl(PR_SET_MM, PR_SET_MM_AUXV, (unsigned long)auxv, n->desc_sz, 0) <
+        0)
+      fprintf(stderr, "Warning: PR_SET_MM_AUXV failed: errno=%d\n", errno);
+  }
+
+out:
+  return 0;
+}
+
+static void set_auxv(const char *path, int fd, Elf64_Ehdr *ehdr) {
+  struct path_fd pf = {.path = path, .fd = fd};
+  if (for_each_note(path, fd, ehdr, set_auxv_from_note, &pf) == -1)
+    exit(EXIT_FAILURE);
+}
+
 static void execore_1(const char *core_path, int fd, const char *sysroot,
                       char **gdb_argv) {
   Elf64_Ehdr ehdr;
@@ -379,6 +409,7 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
     map_nt_files(core_path, fd, sysroot, &ehdr);
     read_phdrs(core_path, fd, &ehdr);
     protect_phdrs(core_path, fd, &ehdr);
+    set_auxv(core_path, fd, &ehdr);
     close(fd);
     sys_ptrace(PTRACE_TRACEME, 0, 0, 0);
     raise(SIGSTOP);
