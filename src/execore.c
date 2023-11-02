@@ -571,13 +571,14 @@ static void __attribute__((noreturn)) execore(void *arg) {
     goto err;
   }
 
-  int gdb_argc = 5 + (aa->argc - argn);
+  int gdb_argc = 6 + (aa->argc - argn);
   char **gdb_argv = alloca((gdb_argc + 1) * sizeof(char *));
   int gdb_argn = 0;
   gdb_argv[gdb_argn++] = "gdb";
   gdb_argv[gdb_argn++] =
       strdupa(aa->argv[0]); /* execfn, filled by execore_1() */
   gdb_argn++;               /* real pid, filled by execore_1() */
+  gdb_argv[gdb_argn++] = "--eval-command=set confirm off";
   /* https://github.com/mephi42/gdb-pounce/blob/v0.0.16/gdb-pounce#L411 */
   gdb_argv[gdb_argn++] = "--eval-command=handle SIGSTOP nostop noprint nopass";
   strcpy(add_symbol_file, "--eval-command=add-symbol-file ");
