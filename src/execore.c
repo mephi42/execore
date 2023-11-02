@@ -137,28 +137,36 @@ static int get_prot(Elf64_Word p_flags) {
   return prot;
 }
 
-struct pid_path_fd {
+struct setregset_context {
   pid_t pid;
   const char *path;
   int fd;
+  int tid;
+  int current_tid;
 };
 
 static int setregset(struct note *n, void *arg) {
-  struct pid_path_fd *ppf = arg;
+  struct setregset_context *ctx = arg;
 
   if (strcmp(n->name, "CORE") == 0 && n->type == NT_PRSTATUS) {
     if (n->desc_sz != (ssize_t)sizeof(struct elf_prstatus)) {
-      fprintf(stderr, "%s contains a bad NT_PRSTATUS\n", ppf->path);
+      fprintf(stderr, "%s contains a bad NT_PRSTATUS\n", ctx->path);
       goto err;
     }
-    elf_gregset_t reg;
-    PREAD_EXACT(ppf->path, ppf->fd, &reg, sizeof(reg),
-                n->desc_off + offsetof(struct elf_prstatus, pr_reg), err);
-    if (arch_fixup_prstatus(ppf->pid, &reg) == -1)
+    struct elf_prstatus prstatus;
+    PREAD_EXACT(ctx->path, ctx->fd, &prstatus, sizeof(prstatus), n->desc_off,
+                err);
+    ctx->current_tid = prstatus.pr_pid;
+    if (ctx->tid == -1)
+      ctx->tid = ctx->current_tid;
+    if (ctx->tid != ctx->current_tid)
+      return 0;
+    if (arch_fixup_prstatus(ctx->pid, &prstatus.pr_reg) == -1)
       goto err;
-    struct iovec iov = {.iov_base = &reg, .iov_len = sizeof(reg)};
+    struct iovec iov = {.iov_base = &prstatus.pr_reg,
+                        .iov_len = sizeof(prstatus.pr_reg)};
     long pt_err =
-        sys_ptrace(PTRACE_SETREGSET, ppf->pid, (void *)NT_PRSTATUS, &iov);
+        sys_ptrace(PTRACE_SETREGSET, ctx->pid, (void *)NT_PRSTATUS, &iov);
     if (pt_err < 0) {
       fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
       goto err;
@@ -166,16 +174,19 @@ static int setregset(struct note *n, void *arg) {
     return 0;
   }
 
+  if (ctx->tid != ctx->current_tid)
+    return 0;
+
   if (strcmp(n->name, "CORE") == 0 && n->type == NT_FPREGSET) {
     if (n->desc_sz != (ssize_t)sizeof(elf_fpregset_t)) {
-      fprintf(stderr, "%s contains a bad NT_FPREGSET\n", ppf->path);
+      fprintf(stderr, "%s contains a bad NT_FPREGSET\n", ctx->path);
       goto err;
     }
     elf_fpregset_t reg;
-    PREAD_EXACT(ppf->path, ppf->fd, &reg, sizeof(reg), n->desc_off, err);
+    PREAD_EXACT(ctx->path, ctx->fd, &reg, sizeof(reg), n->desc_off, err);
     struct iovec iov = {.iov_base = &reg, .iov_len = sizeof(reg)};
     long pt_err =
-        sys_ptrace(PTRACE_SETREGSET, ppf->pid, (void *)NT_FPREGSET, &iov);
+        sys_ptrace(PTRACE_SETREGSET, ctx->pid, (void *)NT_FPREGSET, &iov);
     if (pt_err < 0) {
       fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
       goto err;
@@ -376,7 +387,7 @@ static void set_auxv(const char *path, int fd, Elf64_Ehdr *ehdr) {
 }
 
 static void execore_1(const char *core_path, int fd, const char *sysroot,
-                      char **gdb_argv) {
+                      char **gdb_argv, int tid) {
   Elf64_Ehdr ehdr;
   PREAD_EXACT(core_path, fd, &ehdr, sizeof(ehdr), 0, err);
   if (ehdr.e_ident[EI_MAG0] != ELFMAG0 || ehdr.e_ident[EI_MAG1] != ELFMAG1 ||
@@ -426,8 +437,9 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
     goto err_kill;
   }
 
-  struct pid_path_fd ppf = {.pid = pid, .path = core_path, .fd = fd};
-  if (for_each_note(core_path, fd, &ehdr, setregset, &ppf) == -1)
+  struct setregset_context ctx = {
+      .pid = pid, .path = core_path, .fd = fd, .tid = tid, .current_tid = -1};
+  if (for_each_note(core_path, fd, &ehdr, setregset, &ctx) == -1)
     goto err_kill;
 
   long pt_err = sys_ptrace(PTRACE_DETACH, pid, 0, (void *)SIGSTOP);
@@ -459,9 +471,13 @@ static void __attribute__((noreturn)) execore(void *arg) {
   char *core_path = NULL;
   char *sysroot = NULL;
   int argn = 1;
+  int tid = -1;
   while (argn < aa->argc) {
     if (strncmp(aa->argv[argn], "--sysroot=", 10) == 0) {
       sysroot = strdupa(aa->argv[argn] + 10);
+      argn++;
+    } else if (strncmp(aa->argv[argn], "--tid=", 6) == 0) {
+      tid = atoi(aa->argv[argn] + 6);
       argn++;
     } else if (core_path == NULL) {
       core_path = strdupa(aa->argv[argn]);
@@ -504,7 +520,7 @@ static void __attribute__((noreturn)) execore(void *arg) {
     goto err;
   }
 
-  execore_1(core_path, fd, sysroot, gdb_argv);
+  execore_1(core_path, fd, sysroot, gdb_argv, tid);
 
   close(fd);
 err:
