@@ -168,6 +168,7 @@ def dump_regs(fp, arch, epoch_insns):
     except gdb.error:
         return False
     fp.write(s)
+    fp.flush()
     return True
 
 
