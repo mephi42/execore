@@ -145,7 +145,7 @@ class PPC64:
         "$lr",
         "$ctr",
     ]
-    STOP_INSNS = ["mftb", "mftbu", "mfspr", "sc"]
+    STOP_INSNS = ["mftb", "mftbu", "mfspr", "sc", "scv"]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
