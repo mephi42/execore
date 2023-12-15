@@ -337,9 +337,13 @@ def this_file():
     return os.path.realpath(inspect.getfile(lambda: None))
 
 
-def check_call(argv):
-    print("$ {}".format(shlex.join(argv)))
-    subprocess.check_call(argv)
+def shlex_join(xs):
+    return " ".join(shlex.quote(x) for x in xs)
+
+
+def check_call(argv, **kwargs):
+    print("$ {}".format(shlex_join(argv)))
+    subprocess.check_call(argv, **kwargs)
 
 
 def ssh(remote, *args):
@@ -402,6 +406,12 @@ class ExecoreRecordReplay(gdb.Command):
             type=int,
             help="The number of instructions to record and replay",
         )
+        parser.add_argument(
+            "--symlink",
+            action="append",
+            default=[],
+            help="Symlink to create before replaying, in SRC:DST format",
+        )
         try:
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
@@ -458,11 +468,23 @@ class ExecoreRecordReplay(gdb.Command):
                         args.remote,
                         " && ".join(
                             (
-                                shlex.join(["cd", remote_dir]),
+                                shlex_join(["cd", remote_dir]),
                                 "(echo "
                                 + core_hash.hexdigest()
                                 + " core.0 | sha256sum --check)",
-                                shlex.join(
+                                *(
+                                    shlex_join(
+                                        [
+                                            "ln",
+                                            "-fsT",
+                                            "{}/sysroot/{}".format(remote_dir, src),
+                                            "{}/sysroot/{}".format(remote_dir, dst),
+                                        ]
+                                    )
+                                    for symlink in args.symlink
+                                    for src, dst in (symlink.split(":"),)
+                                ),
+                                shlex_join(
                                     [
                                         args.execore,
                                         "--sysroot=sysroot",
