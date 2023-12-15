@@ -1,0 +1,50 @@
+#!/bin/bash
+set -e -u -x -o pipefail
+
+source_dir=$(cd "$(dirname "$0")"/.. && pwd)
+
+execore=$1
+shift
+phoenix=$1
+shift
+execore_dir=$(cd "$(dirname "$execore")" && pwd)
+export PATH=$execore_dir:$PATH
+
+workdir=$(mktemp -d)
+trap 'rm -rf "$workdir"' EXIT
+cd "$workdir"
+
+# Create a minimalistic chroot.
+files=("$phoenix")
+readarray -O 1 -t files < <(
+    ldd "$phoenix" |
+        awk 'match($0, /\/.+ \(0x/) {print substr($0, RSTART, RLENGTH - 4)}'
+)
+tar --create --dereference "${files[@]}" | tar --extract --verbose
+
+# Resolve unshare and chroot so that we have only successful execve()s.
+unshare=$(command -v unshare)
+chroot=$(command -v chroot)
+# Run/continue until we get to the phoenix entry point.
+gdb --batch \
+    --eval-command="set python print-stack full" \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="catch syscall execve" \
+    --eval-command="run" \
+    --eval-command="continue" \
+    --eval-command="continue" \
+    --eval-command="continue" \
+    --eval-command="set sysroot $workdir" \
+    --eval-command="execore-record-replay --remote=$USER@localhost --execore=$execore 1000" \
+    --eval-command=quit \
+    --args "$unshare" --map-root-user "$chroot" "$workdir" "$phoenix" 2>&1 | tee log
+grep "is executing new program: $chroot" log
+grep "is executing new program: $workdir$phoenix" log
+grep "Saved corefile" log
+if grep "mapping zeros at 0x" log; then exit 1; fi
+# TODO: AT_EXECFN contains the executable path as seen from the chroot, but
+# TODO: the sysroot is synced based on objfiles, which are seen from the host.
+# TODO: That GDB does not see the binary when replaying is merely annoying, so
+# TODO: let it be for now.
+# if grep "$phoenix: No such file or directory" log; then exit 1; fi
+grep "Traces match" log
