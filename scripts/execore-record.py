@@ -527,16 +527,26 @@ class ExecoreRecordReplay(gdb.Command):
                         )
                         ssh(args.remote, "rm", remote_memory_replay_path)
                 try:
-                    check_call([diff, "--unified=50", trace_replay_path, trace_path])
-                    if args.memory:
+                    trace_diff = "trace.diff"
+                    outputs.append(trace_diff)
+                    with open(trace_diff, "wb") as fp:
                         check_call(
-                            [
-                                diff,
-                                "--unified=50",
-                                memory_replay_path,
-                                memory_path,
-                            ]
+                            [diff, "--unified=50", trace_replay_path, trace_path],
+                            stdout=fp,
                         )
+                    if args.memory:
+                        memory_diff = "memory.diff"
+                        outputs.append(memory_diff)
+                        with open(memory_diff, "wb") as fp:
+                            check_call(
+                                [
+                                    diff,
+                                    "--unified=50",
+                                    memory_replay_path,
+                                    memory_path,
+                                ],
+                                stdout=fp,
+                            )
                 except subprocess.CalledProcessError:
                     print("\nTraces do not match, see: {}\n".format(", ".join(outputs)))
                     return
