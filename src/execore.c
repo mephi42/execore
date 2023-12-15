@@ -230,17 +230,9 @@ struct path_fd_sysroot {
 
 static int map_nt_file(struct nt_file *f, void *arg) {
   struct path_fd_sysroot *pfs = arg;
-  const char *filename;
-  if (pfs->sysroot == NULL) {
-    filename = f->filename;
-  } else {
-    size_t sysroot_len = strlen(pfs->sysroot);
-    size_t filename_len = strlen(f->filename);
-    char *buf = alloca(sysroot_len + filename_len + 1);
-    memcpy(buf, pfs->sysroot, sysroot_len);
-    memcpy(buf + sysroot_len, f->filename, filename_len + 1);
-    filename = buf;
-  }
+  const char *filename = f->filename;
+  if (pfs->sysroot != NULL)
+    filename = strcata(pfs->sysroot, filename);
   int fd = open(filename, O_RDONLY);
   void *p;
   if (fd == -1) {
@@ -509,6 +501,8 @@ static void execore_1(const char *core_path, int fd, const char *sysroot,
         fprintf(stderr, "Warning: could not read AT_EXECFN\n");
       } else {
         gdb_argv[1] = execfn;
+        if (sysroot != NULL)
+          gdb_argv[1] = strcata(sysroot, gdb_argv[1]);
       }
     }
   }
