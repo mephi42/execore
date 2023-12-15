@@ -246,18 +246,29 @@ def dump_memory(path):
 
 
 class ExecoreRecord(gdb.Command):
+    NAME = "execore-record"
+
     def __init__(self):
-        super(ExecoreRecord, self).__init__("execore-record", gdb.COMMAND_USER)
+        super(ExecoreRecord, self).__init__(self.NAME, gdb.COMMAND_USER)
 
     def invoke(self, arg, from_tty):
-        max_insns = int(arg)
+        parser = argparse.ArgumentParser(
+            prog=self.NAME, description="Record instruction trace"
+        )
+        parser.add_argument(
+            "max_insns", type=int, help="The number of instructions to record"
+        )
+        try:
+            args = parser.parse_args(shlex.split(arg))
+        except SystemExit:
+            return
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         total_insns = 0
         epoch = 0
         objfile_names = set()
         filename = "execore.tar.gz"
         with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
-            while total_insns < max_insns:
+            while total_insns < args.max_insns:
                 core_path = os.path.join(os.getcwd(), "core.{}".format(epoch))
                 try:
                     gdb.execute("generate-core-file {}".format(core_path))
@@ -268,7 +279,7 @@ class ExecoreRecord(gdb.Command):
                 objfile_names.update(iter_objfile_names())
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
                 total_insns, _, proceed = record_epoch(
-                    trace_path, arch, total_insns, max_insns
+                    trace_path, arch, total_insns, args.max_insns
                 )
                 tf.add(trace_path)
                 os.unlink(trace_path)
@@ -281,11 +292,15 @@ class ExecoreRecord(gdb.Command):
 
 
 class ExecoreReplay(gdb.Command):
+    NAME = "execore-replay"
+
     def __init__(self):
-        super(ExecoreReplay, self).__init__("execore-replay", gdb.COMMAND_USER)
+        super(ExecoreReplay, self).__init__(self.NAME, gdb.COMMAND_USER)
 
     def invoke(self, arg, from_tty):
-        parser = argparse.ArgumentParser(description="Replay instruction trace")
+        parser = argparse.ArgumentParser(
+            prog=self.NAME, description="Replay instruction trace"
+        )
         parser.add_argument(
             "--memory", action="store_true", help="Generate a memory dump at the end"
         )
@@ -293,7 +308,10 @@ class ExecoreReplay(gdb.Command):
             "max_insns", type=int, help="The number of instructions to replay"
         )
         parser.add_argument("epoch", type=int, help="Epoch number")
-        args = parser.parse_args(shlex.split(arg))
+        try:
+            args = parser.parse_args(shlex.split(arg))
+        except SystemExit:
+            return
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         gdb.execute("set pagination off")
         with open("trace.{}.r".format(args.epoch), "w") as fp:
@@ -358,14 +376,14 @@ def temporary_remote_directory(remote):
 
 
 class ExecoreRecordReplay(gdb.Command):
+    NAME = "execore-record-replay"
+
     def __init__(self):
-        super(ExecoreRecordReplay, self).__init__(
-            "execore-record-replay", gdb.COMMAND_USER
-        )
+        super(ExecoreRecordReplay, self).__init__(self.NAME, gdb.COMMAND_USER)
 
     def invoke(self, arg, from_tty):
         parser = argparse.ArgumentParser(
-            description="Record, replay and compare instruction traces"
+            prog=self.NAME, description="Record, replay and compare instruction traces"
         )
         parser.add_argument(
             "--execore",
@@ -383,7 +401,10 @@ class ExecoreRecordReplay(gdb.Command):
             type=int,
             help="The number of instructions to record and replay",
         )
-        args = parser.parse_args(shlex.split(arg))
+        try:
+            args = parser.parse_args(shlex.split(arg))
+        except SystemExit:
+            return
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         with temporary_remote_directory(args.remote) as remote_dir:
             total_insns = 0
