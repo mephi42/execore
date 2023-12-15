@@ -130,6 +130,7 @@ set(PHOENIX_TESTS
         test/record-replay-remote-fgmemory.test
         test/record-replay-remote-memory.test
         test/record-replay-remote.test
+        test/record-replay-remote-chroot.test
         test/record+replay.test
         test/record-replay.test
 )
