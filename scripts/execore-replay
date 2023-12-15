@@ -1,6 +1,13 @@
 #!/bin/sh
 # Usage: execore-replay execore.tar.gz
 set -e -u -x
+diff=$(command -v colordiff || command -v diff) || {
+    set +x
+    echo >&2
+    echo "Error: neither colordiff nor diff found in \$PATH" >&2
+    echo >&2
+    exit 1
+}
 basedir=$(cd "$(dirname "$0")" && pwd)
 tgz=$1
 execore=$(command -v execore) || {
@@ -35,7 +42,7 @@ while [ -e trace."$epoch" ]; do
 done
 i=0
 while [ "$i" -lt "$epoch" ]; do
-    colordiff --unified=50 trace."$i".r trace."$i" || true
+    "$diff" --unified=50 trace."$i".r trace."$i" || true
     i=$((i + 1))
 done >"$pwd"/execore.diff
 set +x

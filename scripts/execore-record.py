@@ -380,6 +380,15 @@ def temporary_remote_directory(remote):
         ssh(remote, "rm", "-r", remote_dir)
 
 
+def get_diff_command():
+    diff = shutil.which("colordiff")
+    if diff is None:
+        diff = shutil.which("diff")
+    if diff is None:
+        raise RuntimeError("Neither colordiff nor diff found in $PATH")
+    return diff
+
+
 class ExecoreRecordReplay(gdb.Command):
     NAME = "execore-record-replay"
 
@@ -416,6 +425,7 @@ class ExecoreRecordReplay(gdb.Command):
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
             return
+        diff = get_diff_command()
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         with temporary_remote_directory(args.remote) as remote_dir:
             total_insns = 0
@@ -517,13 +527,11 @@ class ExecoreRecordReplay(gdb.Command):
                         )
                         ssh(args.remote, "rm", remote_memory_replay_path)
                 try:
-                    check_call(
-                        ["colordiff", "--unified=50", trace_replay_path, trace_path]
-                    )
+                    check_call([diff, "--unified=50", trace_replay_path, trace_path])
                     if args.memory:
                         check_call(
                             [
-                                "colordiff",
+                                diff,
                                 "--unified=50",
                                 memory_replay_path,
                                 memory_path,
