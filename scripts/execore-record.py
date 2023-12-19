@@ -548,14 +548,16 @@ class ExecoreRecordReplay(gdb.Command):
                                 stdout=fp,
                             )
                 except subprocess.CalledProcessError:
-                    print("\nTraces do not match, see: {}\n".format(", ".join(outputs)))
+                    print("\nInstructions replayed: {}".format(total_insns))
+                    print("Traces do not match, see: {}\n".format(", ".join(outputs)))
                     return
                 for output in outputs:
                     os.unlink(output)
                 epoch += 1
                 if not proceed:
                     break
-            print("\nTraces match\n")
+            print("\nInstructions replayed: {}".format(total_insns))
+            print("Traces match\n")
 
 
 ExecoreRecord()
