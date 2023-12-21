@@ -358,7 +358,9 @@ def ssh(remote, *args):
 
 
 def rsync(*args):
-    check_call(["rsync", "-avz", *args])
+    check_call(
+        ["rsync", "--archive", "--compress", "--ignore-times", "--verbose", *args]
+    )
 
 
 @contextlib.contextmanager
