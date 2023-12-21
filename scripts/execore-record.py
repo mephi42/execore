@@ -172,25 +172,6 @@ def dump_regs(fp, arch, epoch_insns):
     return True
 
 
-def record_epoch(trace_path, arch, total_insns, max_insns, max_epoch_insns):
-    proceed = True
-    with open(trace_path, "w") as fp:
-        epoch_insns = 0
-        while total_insns < max_insns and (
-            max_epoch_insns is None or epoch_insns < max_epoch_insns
-        ):
-            if not dump_regs(fp, arch, epoch_insns):
-                proceed = False
-                break
-            insn = gdb.execute("x/i $pc", to_string=True)
-            gdb.execute("si")
-            epoch_insns += 1
-            total_insns += 1
-            if any(stop_insn in insn.split() for stop_insn in arch.STOP_INSNS):
-                break
-    return total_insns, epoch_insns, proceed
-
-
 def iter_objfile_names():
     for objfile in gdb.objfiles():
         objfile_name = objfile.filename
@@ -248,6 +229,59 @@ def dump_memory(path):
                     fp.write(" {:02x}".format(data[i][0]))
 
 
+def add_fgmemory(parser):
+    parser.add_argument(
+        "--fgmemory",
+        action="store_true",
+        help="Generate a memory diff after each instruction",
+    )
+
+
+def fgmemory_start():
+    dump_memory("memory.before")
+
+
+def fgmemory_step(fp):
+    dump_memory("memory.after")
+    fp.write(
+        subprocess.run(
+            [
+                "diff",
+                "--label=memory.before",
+                "--label=memory.after",
+                "--unified",
+                "memory.before",
+                "memory.after",
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+        ).stdout.decode()
+    )
+    fp.flush()
+    os.rename("memory.after", "memory.before")
+
+
+def record_epoch(trace_path, arch, total_insns, max_insns, max_epoch_insns, fgmemory):
+    proceed = True
+    with open(trace_path, "w") as fp:
+        epoch_insns = 0
+        while total_insns < max_insns and (
+            max_epoch_insns is None or epoch_insns < max_epoch_insns
+        ):
+            if not dump_regs(fp, arch, epoch_insns):
+                proceed = False
+                break
+            insn = gdb.execute("x/i $pc", to_string=True)
+            gdb.execute("si")
+            epoch_insns += 1
+            total_insns += 1
+            if fgmemory:
+                fgmemory_step(fp)
+            if any(stop_insn in insn.split() for stop_insn in arch.STOP_INSNS):
+                break
+    return total_insns, epoch_insns, proceed
+
+
 class ExecoreRecord(gdb.Command):
     NAME = "execore-record"
 
@@ -266,6 +300,7 @@ class ExecoreRecord(gdb.Command):
             type=int,
             help="The maximum number of instructions to record and replay per epoch",
         )
+        add_fgmemory(parser)
         try:
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
@@ -275,6 +310,8 @@ class ExecoreRecord(gdb.Command):
         epoch = 0
         objfile_names = set()
         filename = "execore.tar.gz"
+        if args.fgmemory:
+            fgmemory_start()
         with tarfile.open(filename, "w:gz", compresslevel=1) as tf:
             while total_insns < args.max_insns:
                 core_path = os.path.join(os.getcwd(), "core.{}".format(epoch))
@@ -287,7 +324,12 @@ class ExecoreRecord(gdb.Command):
                 objfile_names.update(iter_objfile_names())
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
                 total_insns, _, proceed = record_epoch(
-                    trace_path, arch, total_insns, args.max_insns, args.max_epoch_insns
+                    trace_path,
+                    arch,
+                    total_insns,
+                    args.max_insns,
+                    args.max_epoch_insns,
+                    args.fgmemory,
                 )
                 tf.add(trace_path)
                 os.unlink(trace_path)
@@ -316,12 +358,15 @@ class ExecoreReplay(gdb.Command):
             "max_insns", type=int, help="The number of instructions to replay"
         )
         parser.add_argument("epoch", type=int, help="Epoch number")
+        add_fgmemory(parser)
         try:
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
             return
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
         gdb.execute("set pagination off")
+        if args.fgmemory:
+            fgmemory_start()
         with open("trace.{}.r".format(args.epoch), "w") as fp:
             epoch_insns = 0
             while epoch_insns < args.max_insns:
@@ -333,6 +378,8 @@ class ExecoreReplay(gdb.Command):
                     return
                 gdb.execute("si")
                 epoch_insns += 1
+                if args.fgmemory:
+                    fgmemory_step(fp)
         if args.memory:
             dump_memory("memory.{}.r".format(args.epoch))
         gdb.execute("kill")
@@ -435,12 +482,15 @@ class ExecoreRecordReplay(gdb.Command):
             type=int,
             help="The maximum number of instructions to record and replay per epoch",
         )
+        add_fgmemory(parser)
         try:
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
             return
         diff = get_diff_command()
         arch = ARCHES[gdb.selected_inferior().architecture().name()]
+        if args.fgmemory:
+            fgmemory_start()
         with temporary_remote_directory(args.remote) as remote_dir:
             total_insns = 0
             epoch = 0
@@ -452,7 +502,12 @@ class ExecoreRecordReplay(gdb.Command):
                     break
                 trace_path = "trace.{}".format(epoch)
                 total_insns, epoch_insns, proceed = record_epoch(
-                    trace_path, arch, total_insns, args.max_insns, args.max_epoch_insns
+                    trace_path,
+                    arch,
+                    total_insns,
+                    args.max_insns,
+                    args.max_epoch_insns,
+                    args.fgmemory,
                 )
                 memory_path = "memory.{}".format(epoch)
                 if args.memory:
@@ -469,8 +524,11 @@ class ExecoreRecordReplay(gdb.Command):
                             core_path,
                             "--batch",
                             "--eval-command=source {}".format(this_file()),
-                            "--eval-command=execore-replay {}{} {}".format(
-                                "--memory " if args.memory else "", epoch_insns, epoch
+                            "--eval-command=execore-replay {}{}{} {}".format(
+                                "--memory " if args.memory else "",
+                                "--fgmemory " if args.fgmemory else "",
+                                epoch_insns,
+                                epoch,
                             ),
                         ],
                     )
@@ -517,8 +575,9 @@ class ExecoreRecordReplay(gdb.Command):
                                         "--eval-command=source {}".format(
                                             os.path.basename(this_file())
                                         ),
-                                        "--eval-command=execore-replay {}{} 0".format(
+                                        "--eval-command=execore-replay {}{}{} 0".format(
                                             "--memory " if args.memory else "",
+                                            "--fgmemory " if args.fgmemory else "",
                                             epoch_insns,
                                         ),
                                     ]

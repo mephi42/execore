@@ -125,7 +125,9 @@ set(PHOENIX_TESTS
         test/phoenix.test
         test/record+replay-crash.test
         test/record-replay-crash.test
+        test/record-replay-fgmemory.test
         test/record-replay-memory.test
+        test/record-replay-remote-fgmemory.test
         test/record-replay-remote-memory.test
         test/record-replay-remote.test
         test/record+replay.test
