@@ -1,18 +1,5 @@
 #!/bin/bash
-set -e -u -x -o pipefail
-
-source_dir=$(cd "$(dirname "$0")"/.. && pwd)
-
-execore=$1
-shift
-phoenix=$1
-shift
-execore_dir=$(cd "$(dirname "$execore")" && pwd)
-export PATH=$execore_dir:$PATH
-
-workdir=$(mktemp -d)
-trap 'rm -rf "$workdir"' EXIT
-cd "$workdir"
+source "$(dirname "$0")"/phoenix-common.sh
 
 gdb "$phoenix" \
     --batch \

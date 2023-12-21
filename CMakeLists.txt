@@ -121,27 +121,27 @@ add_test(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-set(RECORD_REPLAY_TESTS
-        test/record+replay.test
+set(PHOENIX_TESTS
+        test/phoenix.test
         test/record+replay-crash.test
-        test/record-replay.test
         test/record-replay-crash.test
         test/record-replay-memory.test
-        test/record-replay-remote.test
         test/record-replay-remote-memory.test
+        test/record-replay-remote.test
+        test/record+replay.test
+        test/record-replay.test
 )
 
 set(SHELL_SOURCES
         scripts/execore-replay
-        test/phoenix.test
-        test/record-replay.test
+        test/phoenix-common.sh
         test/test_execvpe.sh
-        ${RECORD_REPLAY_TESTS}
+        ${PHOENIX_TESTS}
 )
 
 add_test(
         NAME shellcheck
-        COMMAND shellcheck ${SHELL_SOURCES}
+        COMMAND shellcheck --source-path=test ${SHELL_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
@@ -151,7 +151,7 @@ add_test(
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-foreach(test ${RECORD_REPLAY_TESTS})
+foreach(test ${PHOENIX_TESTS})
   get_filename_component(test_name ${test} NAME)
   add_test(
           NAME ${test_name}
