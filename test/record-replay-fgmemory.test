@@ -1,0 +1,12 @@
+#!/bin/bash
+source "$(dirname "$0")"/phoenix-common.sh
+
+gdb "$phoenix" \
+    --batch \
+    --eval-command="set python print-stack full" \
+    --eval-command="source $source_dir/scripts/execore-record.py" \
+    --eval-command="starti" \
+    --eval-command="execore-record-replay --fgmemory 10" \
+    --eval-command=quit 2>&1 | tee log
+grep "Saved corefile" log
+grep "Traces match" log
