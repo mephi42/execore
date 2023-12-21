@@ -1,14 +1,5 @@
 #!/bin/bash
-set -e -u -x -o pipefail
-
-execore=$1
-shift
-phoenix=$1
-shift
-
-workdir=$(mktemp -d)
-trap 'rm -rf "$workdir"' EXIT
-cd "$workdir"
+source "$(dirname "$0")"/phoenix-common.sh
 
 ulimit -c unlimited
 gdb "$phoenix" \
