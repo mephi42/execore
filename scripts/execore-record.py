@@ -172,11 +172,13 @@ def dump_regs(fp, arch, epoch_insns):
     return True
 
 
-def record_epoch(trace_path, arch, total_insns, max_insns):
+def record_epoch(trace_path, arch, total_insns, max_insns, max_epoch_insns):
     proceed = True
     with open(trace_path, "w") as fp:
         epoch_insns = 0
-        while total_insns < max_insns:
+        while total_insns < max_insns and (
+            max_epoch_insns is None or epoch_insns < max_epoch_insns
+        ):
             if not dump_regs(fp, arch, epoch_insns):
                 proceed = False
                 break
@@ -259,6 +261,11 @@ class ExecoreRecord(gdb.Command):
         parser.add_argument(
             "max_insns", type=int, help="The number of instructions to record"
         )
+        parser.add_argument(
+            "--max-epoch-insns",
+            type=int,
+            help="The maximum number of instructions to record and replay per epoch",
+        )
         try:
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
@@ -280,7 +287,7 @@ class ExecoreRecord(gdb.Command):
                 objfile_names.update(iter_objfile_names())
                 trace_path = os.path.join(os.getcwd(), "trace.{}".format(epoch))
                 total_insns, _, proceed = record_epoch(
-                    trace_path, arch, total_insns, args.max_insns
+                    trace_path, arch, total_insns, args.max_insns, args.max_epoch_insns
                 )
                 tf.add(trace_path)
                 os.unlink(trace_path)
@@ -421,6 +428,11 @@ class ExecoreRecordReplay(gdb.Command):
             default=[],
             help="Symlink to create before replaying, in SRC:DST format",
         )
+        parser.add_argument(
+            "--max-epoch-insns",
+            type=int,
+            help="The maximum number of instructions to record and replay per epoch",
+        )
         try:
             args = parser.parse_args(shlex.split(arg))
         except SystemExit:
@@ -438,7 +450,7 @@ class ExecoreRecordReplay(gdb.Command):
                     break
                 trace_path = "trace.{}".format(epoch)
                 total_insns, epoch_insns, proceed = record_epoch(
-                    trace_path, arch, total_insns, args.max_insns
+                    trace_path, arch, total_insns, args.max_insns, args.max_epoch_insns
                 )
                 memory_path = "memory.{}".format(epoch)
                 if args.memory:
