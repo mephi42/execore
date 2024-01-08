@@ -97,7 +97,7 @@ class X86_64:
         "$fs",
         "$gs",
     ]
-    STOP_INSNS = ["syscall", "rdtsc", "cpuid"]
+    STOP_INSNS = ["syscall", "rdtsc", "cpuid", "xsavec"]
 
     @classmethod
     def fixup_reg(cls, reg, reg_val):
