@@ -15,6 +15,25 @@
 
 static char local_stack[8 * 1024 * 1024];
 
+struct setregset_context {
+  pid_t pid;
+  const char *path;
+  int fd;
+  int tid;
+  int current_tid;
+};
+
+static int setregset_1(struct setregset_context *ctx, void *buf, size_t len,
+                       uintptr_t type) {
+  struct iovec iov = {.iov_base = buf, .iov_len = len};
+  long pt_err = sys_ptrace(PTRACE_SETREGSET, ctx->pid, (void *)type, &iov);
+  if (pt_err < 0) {
+    fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
+    return -1;
+  }
+  return 0;
+}
+
 #if defined(__x86_64__)
 
 #define ARCH_EM EM_X86_64
@@ -41,6 +60,19 @@ static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
   (void)pid;
   (void)reg;
   return 0;
+}
+
+static int arch_setregset(struct setregset_context *ctx, struct note *n) {
+  if (strcmp(n->name, "LINUX") == 0 && n->type == NT_X86_XSTATE) {
+    char reg[n->desc_sz];
+    PREAD_EXACT(ctx->path, ctx->fd, reg, sizeof(reg), n->desc_off, err);
+    return setregset_1(ctx, reg, sizeof(reg), n->type);
+  }
+
+  return 0;
+
+err:
+  return -1;
 }
 
 #elif defined(__s390x__)
@@ -87,6 +119,12 @@ static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
   return 0;
 }
 
+static int arch_setregset(struct setregset_context *ctx, struct note *n) {
+  (void)ctx;
+  (void)n;
+  return 0;
+}
+
 #elif defined(__powerpc64__)
 
 #define ARCH_EM EM_PPC64
@@ -116,6 +154,12 @@ static int arch_fixup_prstatus(pid_t pid, elf_gregset_t *reg) {
   return 0;
 }
 
+static int arch_setregset(struct setregset_context *ctx, struct note *n) {
+  (void)ctx;
+  (void)n;
+  return 0;
+}
+
 #else
 #error Unsupported architecture
 #endif
@@ -137,14 +181,6 @@ static int get_prot(Elf64_Word p_flags) {
   return prot;
 }
 
-struct setregset_context {
-  pid_t pid;
-  const char *path;
-  int fd;
-  int tid;
-  int current_tid;
-};
-
 static int setregset(struct note *n, void *arg) {
   struct setregset_context *ctx = arg;
 
@@ -163,15 +199,7 @@ static int setregset(struct note *n, void *arg) {
       return 0;
     if (arch_fixup_prstatus(ctx->pid, &prstatus.pr_reg) == -1)
       goto err;
-    struct iovec iov = {.iov_base = &prstatus.pr_reg,
-                        .iov_len = sizeof(prstatus.pr_reg)};
-    long pt_err =
-        sys_ptrace(PTRACE_SETREGSET, ctx->pid, (void *)NT_PRSTATUS, &iov);
-    if (pt_err < 0) {
-      fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
-      goto err;
-    }
-    return 0;
+    return setregset_1(ctx, &prstatus.pr_reg, sizeof(prstatus.pr_reg), n->type);
   }
 
   if (ctx->tid != ctx->current_tid)
@@ -184,17 +212,10 @@ static int setregset(struct note *n, void *arg) {
     }
     elf_fpregset_t reg;
     PREAD_EXACT(ctx->path, ctx->fd, &reg, sizeof(reg), n->desc_off, err);
-    struct iovec iov = {.iov_base = &reg, .iov_len = sizeof(reg)};
-    long pt_err =
-        sys_ptrace(PTRACE_SETREGSET, ctx->pid, (void *)NT_FPREGSET, &iov);
-    if (pt_err < 0) {
-      fprintf(stderr, "PTRACE_SETREGSET failed: errno=%d\n", (int)-pt_err);
-      goto err;
-    }
-    return 0;
+    return setregset_1(ctx, &reg, sizeof(reg), n->type);
   }
 
-  return 0;
+  return arch_setregset(ctx, n);
 
 err:
   return -1;
