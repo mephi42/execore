@@ -26,7 +26,7 @@ tar --create --dereference "${files[@]}" | tar --extract --verbose
 unshare=$(command -v unshare)
 chroot=$(command -v chroot)
 # Run/continue until we get to the phoenix entry point.
-gdb --batch \
+taskset --cpu-list 0 gdb --batch \
     --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
     --eval-command="catch syscall execve" \

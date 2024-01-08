@@ -2,7 +2,7 @@
 source "$(dirname "$0")"/phoenix-common.sh
 
 ulimit -c unlimited
-gdb "$phoenix" \
+taskset --cpu-list 0 gdb "$phoenix" \
     --batch \
     --eval-command="set python print-stack full" \
     --eval-command=run \

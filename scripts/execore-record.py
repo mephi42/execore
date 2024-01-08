@@ -261,23 +261,39 @@ def fgmemory_step(fp):
     os.rename("memory.after", "memory.before")
 
 
-def record_epoch(trace_path, arch, total_insns, max_insns, max_epoch_insns, fgmemory):
+def record_epoch(
+    trace_path, arch, total_insns, max_insns, max_epoch_insns, memory_path, fgmemory
+):
     proceed = True
     with open(trace_path, "w") as fp:
         epoch_insns = 0
-        while total_insns < max_insns and (
-            max_epoch_insns is None or epoch_insns < max_epoch_insns
-        ):
+        while True:
             if not dump_regs(fp, arch, epoch_insns):
+                if memory_path is not None:
+                    with open(memory_path, "w"):
+                        pass
                 proceed = False
+                epoch_insns -= 1
+                break
+            if total_insns >= max_insns or (
+                max_epoch_insns is not None and epoch_insns >= max_epoch_insns
+            ):
+                if memory_path is not None:
+                    dump_memory(memory_path)
                 break
             insn = gdb.execute("x/i $pc", to_string=True)
+            is_stop_insn = any(
+                stop_insn in insn.split() for stop_insn in arch.STOP_INSNS
+            )
+            if memory_path is not None and is_stop_insn:
+                dump_memory(memory_path)
             gdb.execute("si")
-            epoch_insns += 1
+            if not is_stop_insn:
+                epoch_insns += 1
             total_insns += 1
             if fgmemory:
                 fgmemory_step(fp)
-            if any(stop_insn in insn.split() for stop_insn in arch.STOP_INSNS):
+            if is_stop_insn:
                 break
     return total_insns, epoch_insns, proceed
 
@@ -329,6 +345,7 @@ class ExecoreRecord(gdb.Command):
                     total_insns,
                     args.max_insns,
                     args.max_epoch_insns,
+                    None,
                     args.fgmemory,
                 )
                 tf.add(trace_path)
@@ -369,13 +386,15 @@ class ExecoreReplay(gdb.Command):
             fgmemory_start()
         with open("trace.{}.r".format(args.epoch), "w") as fp:
             epoch_insns = 0
-            while epoch_insns < args.max_insns:
+            while True:
                 if not dump_regs(fp, arch, epoch_insns):
                     if args.memory:
                         with open("memory.{}.r".format(args.epoch), "w"):
                             pass
                     gdb.execute("quit")
                     return
+                if epoch_insns >= args.max_insns:
+                    break
                 gdb.execute("si")
                 epoch_insns += 1
                 if args.fgmemory:
@@ -501,17 +520,18 @@ class ExecoreRecordReplay(gdb.Command):
                 except gdb.error:
                     break
                 trace_path = "trace.{}".format(epoch)
+                memory_path = "memory.{}".format(epoch)
                 total_insns, epoch_insns, proceed = record_epoch(
                     trace_path,
                     arch,
                     total_insns,
                     args.max_insns,
                     args.max_epoch_insns,
+                    memory_path if args.memory else None,
                     args.fgmemory,
                 )
-                memory_path = "memory.{}".format(epoch)
-                if args.memory:
-                    dump_memory(memory_path)
+                if epoch_insns == 0 and not proceed:
+                    break
                 trace_replay_path = "trace.{}.r".format(epoch)
                 memory_replay_path = "memory.{}.r".format(epoch)
                 outputs = [core_path, trace_path, trace_replay_path]

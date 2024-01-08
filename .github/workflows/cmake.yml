@@ -15,7 +15,7 @@ jobs:
 
     - name: Install packages
       run: sudo apt-get update &&
-           sudo apt-get install -y black colordiff flake8 gdb gcc-powerpc64le-linux-gnu gcc-s390x-linux-gnu shellcheck shfmt
+           sudo apt-get install -y black colordiff flake8 gdb gcc-powerpc64le-linux-gnu gcc-s390x-linux-gnu shellcheck shfmt util-linux
 
     - name: Allow ssh localhost
       run: mkdir -m 700 -p ~/.ssh &&

@@ -1,7 +1,7 @@
 #!/bin/bash
 source "$(dirname "$0")"/phoenix-common.sh
 
-gdb "$phoenix" \
+taskset --cpu-list 0 gdb "$phoenix" \
     --batch \
     --eval-command="set python print-stack full" \
     --eval-command="source $source_dir/scripts/execore-record.py" \
@@ -10,7 +10,7 @@ gdb "$phoenix" \
     --eval-command=quit
 mkdir extracted
 tar -C extracted -xf execore.tar.gz
-[ "$(find extracted -name "trace.*" -print0 | xargs -0 cat | grep -c ^\\[)" = 1000 ]
+[ "$(find extracted -name "trace.*" -print0 | xargs -0 cat | grep -c ^\\[)" = 1001 ]
 rm -r extracted
 "$source_dir"/scripts/execore-replay execore.tar.gz
 cat execore.diff
