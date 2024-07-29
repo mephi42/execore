@@ -82,6 +82,7 @@ err:
 static __attribute__((noreturn)) void
 arch_switch_stack(void __attribute__((noreturn)) (*f)(void *), void *arg,
                   void *stack) {
+  stack = (void *)((long)stack & -0x8L);
   asm("lgr %%r15,%[stack]\n"
       "lgr %%r2,%[arg]\n"
       "br %[f]\n"
