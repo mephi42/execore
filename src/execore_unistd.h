@@ -29,11 +29,14 @@ static __attribute__((unused)) ssize_t pread(int fd, void *buf, size_t count,
 }
 #endif
 
-ssize_t pread_exact(int fd, void *buf, size_t count, off_t offset);
+int pread_exact(int fd, void **buf, size_t *count, off_t *offset);
 
 #define PREAD_EXACT(path, fd, buf, count, offset, label)                       \
   do {                                                                         \
-    if (pread_exact(fd, buf, count, offset) == -1) {                           \
+    void *__buf = (buf);                                                       \
+    size_t __count = (count);                                                  \
+    off_t __offset = (offset);                                                 \
+    if (pread_exact(fd, &__buf, &__count, &__offset) < 0) {                    \
       fprintf(stderr, "Could not read from %s: errno=%d\n", path, errno);      \
       goto label;                                                              \
     }                                                                          \

@@ -340,8 +340,18 @@ struct path_fd {
 
 static int read_phdr(Elf64_Phdr *phdr, void *arg) {
   struct path_fd *pf = arg;
-  PREAD_EXACT(pf->path, pf->fd, (void *)phdr->p_vaddr, phdr->p_filesz,
-              phdr->p_offset, err);
+  void *buf = (void *)phdr->p_vaddr;
+  size_t size = phdr->p_filesz;
+  off_t offset = phdr->p_offset;
+  while (pread_exact(pf->fd, &buf, &size, &offset) < 0) {
+    if (errno != EFAULT) {
+      fprintf(stderr, "Could not read from %s: errno=%d\n", pf->path, errno);
+      goto err;
+    }
+    buf += PAGE_SIZE;
+    size -= PAGE_SIZE;
+    offset += PAGE_SIZE;
+  }
   return 0;
 
 err:

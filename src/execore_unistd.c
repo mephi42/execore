@@ -54,10 +54,9 @@ int EXECORE_(execvpe)(const char *file, char *const argv[],
   return -1;
 }
 
-ssize_t pread_exact(int fd, void *buf, size_t count, off_t offset) {
-  size_t orig_count = count;
-  while (count != 0) {
-    ssize_t n_read = pread(fd, buf, count, offset);
+int pread_exact(int fd, void **buf, size_t *count, off_t *offset) {
+  while (*count != 0) {
+    ssize_t n_read = pread(fd, *buf, *count, *offset);
     if (n_read < 0) {
       return -1;
     }
@@ -65,9 +64,9 @@ ssize_t pread_exact(int fd, void *buf, size_t count, off_t offset) {
       errno = EIO;
       return -1;
     }
-    buf += n_read;
-    count -= n_read;
-    offset += n_read;
+    *buf += n_read;
+    *count -= n_read;
+    *offset += n_read;
   }
-  return orig_count;
+  return 0;
 }
